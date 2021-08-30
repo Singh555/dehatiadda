@@ -1,0 +1,35 @@
+* About to connect() to api.textlocal.in port 443 (#0)
+*   Trying 59.162.167.83...
+* Connected to api.textlocal.in (59.162.167.83) port 443 (#0)
+* Initializing NSS with certpath: sql:/etc/pki/nssdb
+*   CAfile: /etc/pki/tls/certs/ca-bundle.crt
+  CApath: none
+* SSL connection using TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+* Server certificate:
+* 	subject: CN=*.textlocal.in,OU=IT,O=IMI MOBILE PRIVATE LIMITED,L=Hyderabad,ST=Telangana,C=IN
+* 	start date: Mar 06 00:00:00 2020 GMT
+* 	expire date: Jun 09 00:00:00 2022 GMT
+* 	common name: *.textlocal.in
+* 	issuer: CN=DigiCert SHA2 High Assurance Server CA,OU=www.digicert.com,O=DigiCert Inc,C=US
+> POST /send/? HTTP/1.1
+Host: api.textlocal.in
+Accept: */*
+Content-Length: 607
+Expect: 100-continue
+Content-Type: multipart/form-data; boundary=----------------------------2e30df453d19
+
+< HTTP/1.1 100 Continue
+< HTTP/1.1 200 OK
+< Server: nginx
+< Date: Wed, 14 Apr 2021 07:51:23 GMT
+< Content-Type: application/json
+< Content-Length: 313
+< Connection: keep-alive
+< Vary: Accept-Encoding
+< Set-Cookie: PHPSESSID=26gcnihkod8i2d1bbsgunvr6i7; path=/
+< Expires: Mon, 26 Jul 1997 05:00:00 GMT
+< Cache-Control: no-cache, must-revaliDate
+< Pragma: no-cache
+< Access-Control-Allow-Origin: *
+< 
+* Connection #0 to host api.textlocal.in left intact
