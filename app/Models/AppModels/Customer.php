@@ -2625,6 +2625,7 @@ Team,
             Log::debug(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id");
             // update parent id in customers table !!
             $cust_info->parent_id = $parent_id;
+            $cust_info->club = 1;
             if(!$cust_info->save()){
                 Log::error(__CLASS__." :: ".__FUNCTION__." error while updating parent id in customers table for id $cust_info->id with parent id $parent_id");
                 return false;
@@ -2663,7 +2664,25 @@ Team,
         Log::debug(__CLASS__." :: ".__FUNCTION__." current time found as $currentTime");
         Log::debug(__CLASS__." :: ".__FUNCTION__." Starting try catch !!");
         try {
-            
+            // generate payment for the level 0 call for any club !!!
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets validate the level and generate poolm level income with level $level and club $club");
+            if($level == 0){
+                Log::debug(__CLASS__." :: ".__FUNCTION__." level found as $level with club $club, generating pool level income !!");
+                if(!self::generatePoolLevelIncome($parent_id, $child_cust_id, $club, $level)){
+                    Log::error(__CLASS__." :: ".__FUNCTION__." error  while payment pool level income !! ");
+                    return false;
+                }
+            }
+
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets check the child count to update the club of parent !");
+            $child_count = Customers::where('parent_id', $parent_id)->where('id', '!=', $child_cust_id)->where('is_active', 'YES')->where('club', $club)->where('club_level', $level)->count();
+            Log::debug(__CLASS__." :: ".__FUNCTION__." child counf found as $child_count for parent id $parent_id");
+            if($child_count < 3){
+                // lets return true
+                Log::debug(__CLASS__." :: ".__FUNCTION__." ");
+                return true;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." child count is more than 3, parent level need to be updated !!!");
             Log::debug(__CLASS__." :: ".__FUNCTION__." lets fetch the parent id from sponsor id ($cust_info->referred_by) for customer $cust_info->id !! ");
             $parent_id = self::getParentCodeByReferralCode($cust_info->sponsor_id, 4, 1);
             Log::debug(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id");
@@ -2675,11 +2694,16 @@ Team,
         
         }
         catch (JWTException $exc) {
-            Log::error(__CLASS__."::".__FUNCTION__." Exception : ".$exc->getMessage());
+            Log::error(__CLASS__." :: ".__FUNCTION__." Exception : ".$exc->getMessage());
             return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
         }
         return returnResponse("Error while processing !!");
        
+    }
+
+    // generate pool level income 
+    protected static function generatePoolLevelIncome($parent_id, $child_cust_id, $club, $level){
+
     }
 
 
