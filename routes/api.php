@@ -37,6 +37,8 @@ Route::group(['namespace' => 'App','middleware' => ['assign.guard:api_customer']
      // Check User
     Route::post('/google_auth', 'CustomersController@googleAuth');
     Route::post('/google_auth/register', 'CustomersController@googleAuthRegister');
+    Route::post('/become_prime', 'AccountController@becomePrime');
+    Route::post('/validate_prime', 'AccountController@validatePrime');
     
     //logout
     Route::post('/logout', 'CustomersController@logout'); 

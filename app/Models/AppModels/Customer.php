@@ -2611,7 +2611,7 @@ Team,
         return false;
     }
 
-    // Activate customer for pool and give a coupon balance of Rs. 200 
+    
     // Activate customer for pool and give a coupon balance of Rs. 200 
     public static function upgradeMemberSubscription($cust_info)
     {
@@ -2620,8 +2620,58 @@ Team,
         Log::debug(__CLASS__." :: ".__FUNCTION__." current time found as $currentTime");
         Log::debug(__CLASS__." :: ".__FUNCTION__." Starting try catch !!");
         try {
-            Log::debug(__CLASS__." :: ".__FUNCTION__." lets fetch the parent id from sponsor id ($cust_info->sponsor_id) for customer $cust_info->id !! ");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets fetch the parent id from sponsor id ($cust_info->referred_by) for customer $cust_info->id !! ");
             $parent_id = self::getParentCodeByReferralCode($cust_info->sponsor_id, 4, 1);
+            Log::debug(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id");
+            // update parent id in customers table !!
+            $cust_info->parent_id = $parent_id;
+            if(!$cust_info->save()){
+                Log::error(__CLASS__." :: ".__FUNCTION__." error while updating parent id in customers table for id $cust_info->id with parent id $parent_id");
+                return false;
+            }
+
+            // parnet id update completed in customers table !!
+
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets call pool income update with parent id $parent_id and child id $cust_info->id and sponsor id $cust_info->referred_by ");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." club - 1 and level of member to be passed in function as 0");
+            if(!self::upgradePoolAndGenerateIncome($cust_info->id, $cust_info->parent_id, $cust_info->referred_by, 1, 0)){
+                Log::error(__CLASS__." :: ".__FUNCTION__." error while updating pool and processing income generation !!");
+                return false;
+            }
+
+            
+
+        
+        }
+        catch (JWTException $exc) {
+            Log::error(__CLASS__."::".__FUNCTION__." Exception : ".$exc->getMessage());
+            return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
+        }
+        return returnResponse("Error while processing !!");
+       
+    }
+
+    // Upgrade Pool and generate income for members and sponsors as per the need  
+    public static function upgradePoolAndGenerateIncome($child_cust_id, $parent_id, $sponsor_id, $club, $level)
+    {
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with customer core id as $child_cust_id");    
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with parent id as $parent_id");    
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with sponsor id as $sponsor_id");    
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with club as $club");    
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with level as $level");    
+        $currentTime = Carbon::now();
+        Log::debug(__CLASS__." :: ".__FUNCTION__." current time found as $currentTime");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." Starting try catch !!");
+        try {
+            
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets fetch the parent id from sponsor id ($cust_info->referred_by) for customer $cust_info->id !! ");
+            $parent_id = self::getParentCodeByReferralCode($cust_info->sponsor_id, 4, 1);
+            Log::debug(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets call pool income update with parent id $parent_id and child id $cust_info->id and sponsor id $cust_info->referred_by ");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." club - 1 and level of member to be passed in function as 0");
+            
+            
+
         
         }
         catch (JWTException $exc) {
