@@ -16,6 +16,7 @@ use App\Helpers\HttpStatus;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Facades\JWTFactory;
 use Tymon\JWTAuth\Exceptions\JWTException;
+use App\Models\Web\PaymentGatewayModel;
 
 class AccountController extends Controller
 {
@@ -38,15 +39,27 @@ class AccountController extends Controller
     }
     
     
+    // Become Prime/Topup
+    public function becomePrime(Request $request){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." called");
+        return Account::becomePrime($request);
+    }
+    // Become Prime/Topup
+    public function validatePrime(Request $request){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." called");
+        
+        return Account::validatePrime($request);
+    }
+    
     // create cartilo pin
     public function createMPin(Request $request){
         Log::debug(__CLASS__." :: ".__FUNCTION__." called");
-        return Account::createCartiloPin($request);
+        return Account::createMPin($request);
     }
     // create cartilo pin
     public function updateMPin(Request $request){
         Log::debug(__CLASS__." :: ".__FUNCTION__." called");
-        return Account::updateCartiloPin($request);
+        return Account::updateMPin($request);
     }
     // make withdraw request
     public function makeWithdrawRequest(Request $request){
@@ -80,16 +93,9 @@ class AccountController extends Controller
             $offset = $request->offset;
         }
         if ($authenticate == 1 && auth()->user()->id) {
-            if($type == "s_wallet" or $type == "m_wallet"){
-                $table = "";
-                //sendng type s_wallet for main wallet and withdraw for s wallet
-                if($type == "s_wallet"){
-                    $table = "mwallet_txn";
-                } else if($type == "withdraw"){
-                    $table = "swallet_txn";
-                } else if($type == "m_wallet"){
-                   $table = "mwallet_txn";
-               }
+            
+                    $table = "wallet_txn";
+               
                 Log::debug("Table : ".$table." :: ".auth()->user()->id);
                 $data = DB::table($table)
                     ->where('user_id', '=', auth()->user()->id)
@@ -100,7 +106,7 @@ class AccountController extends Controller
                     ->get();
 
                 return returnResponse("Txn data !", HttpStatus::HTTP_OK, HttpStatus::HTTP_SUCCESS, $data);
-            }
+            
             
         }
         return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);

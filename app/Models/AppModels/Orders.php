@@ -1055,11 +1055,11 @@ class Orders extends Model {
 
 
                 if ($wallet_amount > 0) {
-                    if ($cust_info->m_wallet >= $wallet_amount) {
+                    if ($cust_info->wallet_balance >= $wallet_amount) {
                         $payable_amount = $net_amount - $wallet_amount;
                         Log::debug("Payable Amount $payable_amount ");
                         Log::debug("Form Wallet Amount $wallet_amount ");
-                        $balance_after = $cust_info->m_wallet - $wallet_amount;
+                        $balance_after = $cust_info->wallet_balance - $wallet_amount;
                         $order_type = "PRODUCT ORDER";
                         $txn_desc = "Product Order";
                         if (!WalletModel::debitFromMainWallet($customers_id, $wallet_amount, $balance_after, $txn_desc, $order_id, $order_type)) {
@@ -1067,8 +1067,8 @@ class Orders extends Model {
                             return returnResponse("Order failed ! Wallet debiting failed");
                         }
                     } else {
-                        Log::error("Wallet balance " . $cust_info->m_wallet . " is less than wallet $wallet_amount used !!");
-                        return returnResponse("Wallet can be used up to " . $cust_info->m_wallet);
+                        Log::error("Wallet balance " . $cust_info->wallet_balance . " is less than wallet $wallet_amount used !!");
+                        return returnResponse("Wallet can be used up to " . $cust_info->wallet_balance);
                     }
                 }
 
@@ -1781,7 +1781,7 @@ class Orders extends Model {
                             }
 
                             if ($data->payment_method == "Razorpay" && $data->payment_status == "SUCCESS" && $data->pgateway_amount > 0) {
-                                $balance_after = $cust_info->m_wallet + $data->pgateway_amount;
+                                $balance_after = $cust_info->wallet_balance + $data->pgateway_amount;
                                 $order_type = "PRODUCT ORDER";
                                 $txn_desc = "Credit By Cancel Order By Self";
                                 if (!WalletModel::creditInMainWallet(auth()->user()->id, $data->pgateway_amount, $balance_after, $txn_desc, $data->order_id, $order_type)) {
@@ -1790,7 +1790,7 @@ class Orders extends Model {
                                 }
                             }
                             if ($data->wallet_amount > 0 && $data->wallet_amount <= $data->net_amount) {
-                                $balance_after = $cust_info->m_wallet + $data->wallet_amount;
+                                $balance_after = $cust_info->wallet_balance + $data->wallet_amount;
                                 $order_type = "PRODUCT ORDER";
                                 $txn_desc = "Credit By Cancel Order By Self";
                                 if (!WalletModel::creditInMainWallet(auth()->user()->id, $data->wallet_amount, $balance_after, $txn_desc, $data->order_id, $order_type)) {
@@ -1798,21 +1798,21 @@ class Orders extends Model {
                                     return returnResponse("Payment updating failed ! Wallet credit failed");
                                 }
                             }
-                            $m_wallet_block = $cust_info->m_wallet_block;
-                            Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " m_wallet_block amount found as $m_wallet_block");
-                            $m_wallet_block_after = $m_wallet_block + $data->pgateway_amount + $data->wallet_amount;
-                            Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " m_wallet_block amount updated as $m_wallet_block_after");
-                            $update_block_amount = DB::table('users')->where('id', $cust_info->id)->update(['m_wallet_block' => $m_wallet_block_after]);
+                            $wallet_balance_block = $cust_info->wallet_block;
+                            Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " wallet_balance_block amount found as $wallet_balance_block");
+                            $wallet_balance_block_after = $wallet_balance_block + $data->pgateway_amount + $data->wallet_amount;
+                            Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " wallet_balance_block amount updated as $wallet_balance_block_after");
+                            $update_block_amount = DB::table('customers')->where('id', $cust_info->id)->update(['wallet_block' => $wallet_balance_block_after]);
                             if (!$update_block_amount) {
                                 Log::error(__CLASS__ . " :: " . __FUNCTION__ . " error while updating the balance after refund! ");
                                 return returnResponse("Payment updating failed !");
                             }
 
                             if ($data->op_disc_amount > 0 && $data->pgateway_amount > 0) {
-                                $balance_after = $cust_info->advance_wallet + $data->op_disc_amount;
+                                $balance_after = $cust_info->wallet_balance + $data->op_disc_amount;
                                 $order_type = "PRODUCT ORDER";
                                 $txn_desc = "Credit By Cancel Order By Self";
-                                if (!WalletModel::creditInAdvanceWallet(auth()->user()->id, $data->op_disc_amount, $balance_after, $txn_desc, $data->order_id, $order_type)) {
+                                if (!WalletModel::creditInMainWallet(auth()->user()->id, $data->op_disc_amount, $balance_after, $txn_desc, $data->order_id, $order_type)) {
                                     Log::error("error while credit in Advance Wallet !!!");
                                     return returnResponse("Payment error updating failed ! Advance Wallet credit failed");
                                 }
@@ -2294,11 +2294,11 @@ class Orders extends Model {
 
 
                     if ($wallet_amount > 0) {
-                        if ($cust_info->m_wallet >= $wallet_amount) {
+                        if ($cust_info->wallet_balance >= $wallet_amount) {
                             $payable_amount = $net_amount - $wallet_amount;
                             Log::debug("Payable Amount $payable_amount ");
                             Log::debug("Form Wallet Amount $wallet_amount ");
-                            $balance_after = $cust_info->m_wallet - $wallet_amount;
+                            $balance_after = $cust_info->wallet_balance - $wallet_amount;
                             $order_type = "PRODUCT ORDER";
                             $txn_desc = "Product Order";
                             if ($balance_after >= 0) {
@@ -2307,14 +2307,14 @@ class Orders extends Model {
                                     return returnResponse("Order failed ! Wallet debiting failed");
                                 }
 
-                                $m_wallet_block = $cust_info->m_wallet_block;
-                                Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " m_wallet_block amount found as $m_wallet_block");
-                                $m_wallet_block_after = $m_wallet_block - $wallet_amount;
-                                if ($m_wallet_block_after < 0) {
-                                    $m_wallet_block_after = 0;
+                                $wallet_balance_block = $cust_info->wallet_block;
+                                Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " wallet_balance_block amount found as $wallet_balance_block");
+                                $wallet_balance_block_after = $wallet_balance_block - $wallet_amount;
+                                if ($wallet_balance_block_after < 0) {
+                                    $wallet_balance_block_after = 0;
                                 }
-                                Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " m_wallet_block amount updated as $m_wallet_block_after");
-                                $update_block_amount = DB::table('users')->where('id', $cust_info->id)->update(['m_wallet_block' => $m_wallet_block_after]);
+                                Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " wallet_balance_block amount updated as $wallet_balance_block_after");
+                                $update_block_amount = DB::table('users')->where('id', $cust_info->id)->update(['wallet_balance_block' => $wallet_balance_block_after]);
                                 if (!$update_block_amount) {
                                     Log::error(__CLASS__ . " :: " . __FUNCTION__ . " error while updating the block wallet balance! ");
                                     return returnResponse("Payment updating failed !");
@@ -2323,8 +2323,8 @@ class Orders extends Model {
                                 return returnResponse("MWallet balance is low");
                             }
                         } else {
-                            Log::error("Wallet balance " . $cust_info->m_wallet . " is less than wallet $wallet_amount used !!");
-                            return returnResponse("Wallet can be used up to " . $cust_info->m_wallet);
+                            Log::error("Wallet balance " . $cust_info->wallet_balance . " is less than wallet $wallet_amount used !!");
+                            return returnResponse("Wallet can be used up to " . $cust_info->wallet_balance);
                         }
                     }
 

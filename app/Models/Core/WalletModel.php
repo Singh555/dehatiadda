@@ -31,7 +31,7 @@ class WalletModel {
         Log::debug(__CLASS__." :: ".__FUNCTION__." txn mapping type $order_type");
         Log::debug(__CLASS__." :: ".__FUNCTION__." txn with customer id $txn_user_id");
         try {
-            $insert   =   DB::table('mwallet_txn')->insert(['user_id'=>$customer_id,'txn_user_id'=>$txn_user_id,'txn_amount'=>$txn_amount,'txn_type'=>'CREDIT','txn_desc'=>$txn_desc,'txn_date'=>$date,'balance_after'=>$balance_after,'order_id'=>$order_id,'order_type'=>$order_type,'created_by'=>$user, 'created_at'=>$date]);
+            $insert   =   DB::table('wallet_txn')->insert(['user_id'=>$customer_id,'txn_user_id'=>$txn_user_id,'txn_amount'=>$txn_amount,'txn_type'=>'CREDIT','txn_desc'=>$txn_desc,'txn_date'=>$date,'balance_after'=>$balance_after,'order_id'=>$order_id,'order_type'=>$order_type,'created_by'=>$user, 'created_at'=>$date]);
             if($insert){
                 Log::debug(__CLASS__." :: ".__FUNCTION__." txn saved lets update the balance in users table");
                 return self::mainWalletBalanceUpdateInUsersTbl($customer_id, $balance_after);
@@ -56,7 +56,7 @@ class WalletModel {
         Log::debug(__CLASS__." :: ".__FUNCTION__." txn mapping type $order_type");
         Log::debug(__CLASS__." :: ".__FUNCTION__." txn with customer id $txn_user_id");
         try {
-            $insert = DB::table('mwallet_txn')->insert(['user_id'=>$customer_id,'txn_user_id'=>$txn_user_id,'txn_amount'=>$txn_amount,'txn_type'=>'DEBIT','txn_desc'=>$txn_desc,'txn_date'=>$date,'balance_after'=>$balance_after,'order_id'=>$order_id,'order_type'=>$order_type,'created_by'=>$user, 'created_at'=>$date]);
+            $insert = DB::table('wallet_txn')->insert(['user_id'=>$customer_id,'txn_user_id'=>$txn_user_id,'txn_amount'=>$txn_amount,'txn_type'=>'DEBIT','txn_desc'=>$txn_desc,'txn_date'=>$date,'balance_after'=>$balance_after,'order_id'=>$order_id,'order_type'=>$order_type,'created_by'=>$user, 'created_at'=>$date]);
             if($insert){
                 Log::debug(__CLASS__." :: ".__FUNCTION__." txn saved lets update the balance in users table");
                 return self::mainWalletBalanceUpdateInUsersTbl($customer_id, $balance_after);
@@ -73,7 +73,7 @@ class WalletModel {
         Log::debug(__CLASS__." :: ".__FUNCTION__." started with member $customer_id with wallet balance $balance");
         
         try {
-            return DB::table('users')->where('id',$customer_id)->update(['m_wallet'=>$balance]);
+            return DB::table('customers')->where('id',$customer_id)->update(['wallet_balance'=>$balance]);
             
         } catch (Exception $exc) {
             Log::error(__CLASS__." :: ".__FUNCTION__." exception while processing ".$exc->getMessage());

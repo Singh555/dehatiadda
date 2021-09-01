@@ -1365,8 +1365,8 @@ Team,
         } 
         return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
     }
- //prime signup verify
-    
+
+    //prime signup verify    
     public static function primeSignupVerify($request)
     {
         $consumer_data = getallheaders();
@@ -1439,7 +1439,7 @@ Team,
                         if (count($existUser) > 0) {
 
                             $customers_id = $user->id;
-                            $parent_id = self::getParentCodeByReferralCode($referral_id,5,1);
+                            $parent_id = self::getParentCodeByReferralCode($referral_id,4,1);
                             //update record of customers_info
                             $existUserInfo = DB::table('customers_info')->where('customers_info_id', $customers_id)->get();
                             $customers_info_id = $customers_id;
@@ -1589,7 +1589,7 @@ Team,
                 }else{
                     
                     Log::debug('Getting Parent ID');
-                 $parent_id = self::getParentCodeByReferralCode($referral_id,5,1);
+                 $parent_id = self::getParentCodeByReferralCode($referral_id,4,1);
                     if(!empty($email)){
                         $email = strtolower($email);
                     }
@@ -1764,7 +1764,7 @@ Team,
             return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
         
        
-    }    
+    }
     
     public static function normalSignupVerify($request)
     {
@@ -2379,9 +2379,9 @@ Team,
             Log::debug(__CLASS__ . "::" . __FUNCTION__ . "Called with count $count and referral code ::");
             Log::debug($referral_code);
         } else {
-            Log::debug(__CLASS__ . "::" . __FUNCTION__ . "Called with refereal code $referral_code and count $count");
+            Log::debug(__CLASS__ . "::" . __FUNCTION__ . "Called with refferal code $referral_code and count $count");
         }
-        if ($referral_code == 'COMPANY' or $referral_code == "") {
+        if ($referral_code == 'COMPANY' or $referral_code == "" or $referral_code == null) {
             if (is_array($referral_code)) {
                 Log::debug('returnig parent id ');
                 Log::debug($referral_code);
@@ -2420,7 +2420,7 @@ Team,
                 Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " lets get the parent id from array count " . count($data_explode));
                 for ($i = 0; $i < count($data_explode); $i++) {
                     //$child_data2 = DB::table('users')->where('prime_referral',$data_explode[$i])->where('role_id',2)->get();
-                    $child_data2 = DB::table('customers')->where('parent_id', DB::table('customers')->where('member_code', $data_explode[$i])->where('role_id', 2)->first()->id)->where('role_id', 2)->get();
+                    $child_data2 = DB::table('customers')->where('parent_id', DB::table('customers')->where('id', $data_explode[$i])->first()->id)->get();
                     // $child_data2 = DatabaseFactory::executeQueryAndGetData("select * from members where parent_id = '{$data_explode[$i]}'", $con);
                     Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " child count found as " . count($child_data2) . " for member id $data_explode[$i]");
                     if (count($child_data2) < $matrix_of) {
@@ -2610,4 +2610,27 @@ Team,
         }
         return false;
     }
+
+    // Activate customer for pool and give a coupon balance of Rs. 200 
+    // Activate customer for pool and give a coupon balance of Rs. 200 
+    public static function upgradeMemberSubscription($cust_info)
+    {
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with customer core id as $cust_info->id");    
+        $currentTime = Carbon::now();
+        Log::debug(__CLASS__." :: ".__FUNCTION__." current time found as $currentTime");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." Starting try catch !!");
+        try {
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets fetch the parent id from sponsor id ($cust_info->sponsor_id) for customer $cust_info->id !! ");
+            $parent_id = self::getParentCodeByReferralCode($cust_info->sponsor_id, 4, 1);
+        
+        }
+        catch (JWTException $exc) {
+            Log::error(__CLASS__."::".__FUNCTION__." Exception : ".$exc->getMessage());
+            return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
+        }
+        return returnResponse("Error while processing !!");
+       
+    }
+
+
 }

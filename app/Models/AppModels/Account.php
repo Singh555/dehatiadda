@@ -20,6 +20,8 @@ use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Facades\JWTFactory;
 use App\Models\Core\WalletModel;
 use App\Models\Eloquent\Customers;
+use App\Models\Eloquent\CumtomerActHistory;
+use App\Models\AppModels\PaymentGatewayModel;
 class Account extends Model
 {
     
@@ -704,4 +706,216 @@ class Account extends Model
         Log::debug("Data : ".$data);
         return $data;
     }
+    
+    
+    #################################################################################################################################################################################
+    # Become Prime
+    #################################################################################################################################################################################
+    
+    
+    
+     //create Cartilo Pin
+    public static function becomePrime($request)
+    {
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started.. Validating parameters");
+        $validator = Validator::make($request->all(), [
+            'amount' => 'required',
+            'gateway_charge' => 'required',
+            'gateway_charge_per' => 'required',
+            'total_amount' => 'required',
+            
+        ]);
+        Log::debug(__CLASS__." :: ".__FUNCTION__." parameter validated, lets validate the response ");
+        if($validator->fails()){
+            Log::debug(__CLASS__." :: ".__FUNCTION__." validator failed with error, returning the response ");
+            return returnResponse($validator->errors(), HttpStatus::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        Log::debug(__CLASS__." :: ".__FUNCTION__." proceeding further");
+        
+        $pgateway_amount = $request->input('total_amount');
+        $amount = $request->input('amount');
+        $gateway_charge = $request->input('gateway_charge');
+        $gateway_charge_per = $request->input('gateway_charge_per');
+        
+       
+        $consumer_data = getallheaders();
+        
+        $consumer_data['consumer_ip'] = $request->ip();
+        // $consumer_data['consumer_ip'] = request()->header('consumer-ip');
+        $consumer_data['consumer_url'] = __FUNCTION__;
+        $authController = new AppSettingController();
+        $authenticate = $authController->apiAuthenticate($consumer_data);
+        Log::debug(__CLASS__." :: ".__FUNCTION__." fetching settings !!");
+        $settings = $authController->getSetting();
+        
+        Log::debug(__CLASS__." :: ".__FUNCTION__." authenticating user now !!");
+        if($authenticate == 1 && auth()->user()->id) {
+            Log::debug(__CLASS__." :: ".__FUNCTION__." fetching user data from database !!");
+            $user = Customers::where('id', auth()->user()->id)->first();
+            Log::debug(__CLASS__." :: ".__FUNCTION__." user data found validating!!");
+            if($user->id != auth()->user()->id){
+                Log::error(__CLASS__." :: ".__FUNCTION__." user data fetching failed !!");
+                return returnResponse("User data fetching failed !");
+            }
+            
+            if($user->is_active == 'Y'){
+                Log::error(__CLASS__." :: ".__FUNCTION__." user already is a prime member !!");
+                return returnResponse("You Are Already upgraded !");
+            }
+            
+            Log::debug(__CLASS__." :: ".__FUNCTION__." starting try catch");
+            $txn_id = generateGatewayTxnId();
+            if(empty($txn_id)){
+                Log::error(__CLASS__." :: ".__FUNCTION__." txn id generation failed !!");
+                return returnResponse("Some error occured !");
+            }
+            $customers_id = $user->id;
+            $name = $user->name;
+            $mobile_no = $user->phone;
+            try{
+                DB::beginTransaction();
+                Log::debug(__CLASS__." :: ".__FUNCTION__." inside try catch !!");
+                
+              $newCustomerActHistory = new CumtomerActHistory;
+              $newCustomerActHistory->amount = $amount;
+              $newCustomerActHistory->customer_id = $customers_id;
+              $newCustomerActHistory->gateway_charge = $gateway_charge;
+              $newCustomerActHistory->gateway_per = $gateway_charge_per;
+              $newCustomerActHistory->total_amount = $pgateway_amount;
+              $newCustomerActHistory->created_by = auth()->user()->email;
+
+              
+              if(!$newCustomerActHistory->save()){
+                  Log::error(__CLASS__ . " :: " . __FUNCTION__ . " Customer Acount History saving failed");
+                  return returnResponse("some error occured !");
+              }
+
+                Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " pgateway_amount = $pgateway_amount");
+                        $payment_data = PaymentGatewayModel::becomePrimeChashFreeInitiatePayment($customers_id, $customers_id, $newCustomerActHistory->id, $txn_id, $name, $mobile_no, auth()->user()->email, $pgateway_amount, 'Andriod','ACTIVATION');
+               
+               
+               if ($payment_data) {
+                            if (isset($payment_data["cftoken"])) {
+                                $data = array(
+                                    'cf_token' => $payment_data["cftoken"],
+                                    'txn_id' => $txn_id,
+                                    'currency' => 'INR',
+                                    'amount' => $pgateway_amount,
+                                );
+                                DB::commit();
+                                Log::info(__CLASS__ . " :: " . __FUNCTION__ . " token creation success with cash Free token " . $payment_data["cftoken"]);
+                                return returnResponse("token created successfully.", HttpStatus::HTTP_OK, HttpStatus::HTTP_SUCCESS, $data);
+                            } else {
+                                Log::error(__CLASS__ . " :: " . __FUNCTION__ . " token creation ! cash Freetoken not set .");
+                                return returnResponse("token creation failed !!!");
+                            }
+                        }else {
+                            Log::error(__CLASS__ . " :: " . __FUNCTION__ . " error while token creation !!!!!");
+                            return returnResponse("token creation failed !");
+                        }
+               
+                
+                        
+            }catch(\Exception $e){
+                Log::error("Error Occured".$e->getMessage());
+                return returnResponse("Some Error Occured please try again !");
+            }
+        }
+
+        return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
+    }
+    
+    
+    public static function validatePrime($request) {
+      return  PaymentGatewayModel::validateBecomePrimechashFreePayment($request);
+    }
+    
+    public static function getParentCode($child_code) {
+        return DB::table('customers')->where('member_code', $child_code)->first()->parent_id;
+    }
+    
+    protected static function getParentCodeByReferralCode($referral_code, $matrix_of, $count) {
+        Log::debug(__CLASS__ . "::" . __FUNCTION__ . "Called");
+        if (is_array($referral_code)) {
+            Log::debug(__CLASS__ . "::" . __FUNCTION__ . "Called with count $count and referral code ::");
+            Log::debug($referral_code);
+        } else {
+            Log::debug(__CLASS__ . "::" . __FUNCTION__ . "Called with refereal code $referral_code and count $count");
+        }
+        if ($referral_code == 'COMPANY' or $referral_code == "") {
+            if (is_array($referral_code)) {
+                Log::debug('returnig parent id ');
+                Log::debug($referral_code);
+            } else {
+                Log::debug('returnig parent id ' . $referral_code);
+            }
+            return $referral_code;
+        }
+        try {
+            if ($count == 1) {
+                $data = DB::table('customers')->where('parent_id', DB::table('customers')->where('member_code', $referral_code)->first()->id)->orderBY('updated_at')->get();
+            } else {
+                //$data = DB::table('users')->whereIn('prime_referral',$referral_code)->where('role_id',2)->orderBY('prime_time')->get(); 
+                $data = DB::table('customers')->whereIn('parent_id', DB::table('customers')->where('member_code', $referral_code)->first()->id)->orderBY('prime_time')->get();
+            }
+            if (!isset($data)) {
+                Log::error(__CLASS__ . "::" . __FUNCTION__ . " Data not found");
+                return returnResponse("Error While Processing !", HttpStatus::HTTP_BAD_REQUEST);
+            }
+
+            Log::debug('Child Count' . $data->count());
+            $total_child_req = pow($matrix_of, $count);
+            Log::debug('total child required ' . $total_child_req . ' for count ' . $count);
+
+            if ($data->count() > $total_child_req) {
+
+                Log::error(__CLASS__ . "::" . __FUNCTION__ . " child count is " . count($data) . " and required only $total_child_req");
+                return returnResponse("Error While Processing !", HttpStatus::HTTP_BAD_REQUEST);
+            } else if (count($data) < $total_child_req) {
+                if (is_array($referral_code)) {
+                    $data_explode = $referral_code;
+                } else {
+                    $data_explode = explode("','", $referral_code);
+                }
+
+                Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " lets get the parent id from array count " . count($data_explode));
+                for ($i = 0; $i < count($data_explode); $i++) {
+                    //$child_data2 = DB::table('users')->where('prime_referral',$data_explode[$i])->where('role_id',2)->get();
+                    $child_data2 = DB::table('customers')->where('parent_id', DB::table('customers')->where('member_code', $data_explode[$i])->where('role_id', 2)->first()->id)->where('role_id', 2)->get();
+                    // $child_data2 = DatabaseFactory::executeQueryAndGetData("select * from members where parent_id = '{$data_explode[$i]}'", $con);
+                    Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " child count found as " . count($child_data2) . " for member id $data_explode[$i]");
+                    if (count($child_data2) < $matrix_of) {
+                        Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " returning member id for parent id as $data_explode[$i]");
+                        return $data_explode[$i];
+                    }
+                }
+            } else {
+                $count++;
+                //            $member_id_new = "";
+                //                $comma = "";
+                //            foreach ($data as $value) {
+                //                    $member_id_new .= $comma . $value->member_code;
+                //                    $comma = "','";
+                //            }
+
+                $member_id_new = array();
+                foreach ($data as $value) {
+                    array_push($member_id_new, $value->member_code);
+                }
+
+                Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " lets call the method again with member id updated as ");
+                Log::debug($member_id_new);
+                return self::getParentCodeByReferralCode($member_id_new, $matrix_of, $count);
+            }
+        } catch (Exception $e) {
+            
+        }
+    }
+
+    
+    
+    
+    
+    
+    
 }

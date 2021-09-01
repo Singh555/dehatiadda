@@ -11,6 +11,7 @@ use Validator;
 use App\Models\AppModels\Orders;
 use App\Http\Controllers\App\AppSettingController;
 use App\Models\Eloquent\CartModel;
+use App\Models\Eloquent\CumtomerActHistory;
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
@@ -671,7 +672,7 @@ class PaymentGatewayModel {
             // Docs: https://docs.razorpay.com/docs/orders
             //
             $orderData = [
-                'orderId'         => $order_id,
+                'orderId'         => $txn_id,
                 'orderAmount'          => $amount,
                 'orderCurrency'        => 'INR',
                 
@@ -856,6 +857,235 @@ class PaymentGatewayModel {
     
     
     
+    
+    
+    #################################################################################################################
+    # Cashfree payment gateway
+    ###############################################################################################################
+    
+    
+    public static function becomePrimeChashFreeInitiatePayment($customer_id, $user_id, $order_id, $txn_id, $name, $mobile, $email_id, $amount, $platform,$txn_type){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with customer $customer_id, User Id $user_id");
+        if(empty($amount)){
+            Log::debug(__CLASS__." :: ".__FUNCTION__." Amount is empty for customer id $customer_id");
+            return false;
+        }
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with customer id $customer_id");
+        
+        try
+        {
+            Log::debug(__CLASS__." :: ".__FUNCTION__." Txn Id : $txn_id ");
+            $apiKey = "";
+            $apiSecret = "";
+            $cashfreeKey = self::get_payment_methods_detail_value_by_key(4, "CASHFREE_KEY");
+            if(isset($cashfreeKey->value)){
+                $apiKey = $cashfreeKey->value;
+            }
+            $cashfreeSecret = self::get_payment_methods_detail_value_by_key(4, "CASHFREE_SECRET");
+            if(isset($cashfreeSecret->value)){
+                $apiSecret = $cashfreeSecret->value;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." Key : $apiKey, Secret : $apiSecret ");
+           
+            $paymentMethodData = self::get_payment_methods_detail_by_id(4);
+            
+            $url = 'https://test.cashfree.com/api/v2/cftoken/order';
+            if($paymentMethodData->environment ==1){
+                $url = 'https://api.cashfree.com/api/v2/cftoken/order';
+            }
+            
+            //
+            // We create an razorpay order using orders api
+            // Docs: https://docs.razorpay.com/docs/orders
+            //
+            $orderData = [
+                'orderId'         => $txn_id,
+                'orderAmount'          => $amount,
+                'orderCurrency'        => 'INR',
+                
+            ];
+
+            $headers = array("Content-Type: application/json","x-client-id: $apiKey","x-client-secret: $apiSecret");
+            Log::debug(__CLASS__."::".__FUNCTION__." called url as ".$url);
+           $response = callUrlWithHeader($url, $headers, json_encode($orderData));
+           
+           Log::debug(__CLASS__."::".__FUNCTION__." Got response as".json_encode($response));
+           
+            $razorpayOrderId = '';
+            
+            Log::debug(__CLASS__." :: ".__FUNCTION__." Razorpay Order Id : $razorpayOrderId ");
+            $ip = get_client_ip();
+            $user_agent = "";
+            $txnCoreId =  DB::table('pgateway_txn')->insertGetId([
+              'txn_id' => $txn_id,
+              'customer_id' => $customer_id,
+              'orders_id' => '',
+              'order_id' => $order_id,
+              'razorpay_order_id' => $razorpayOrderId,
+              'name' => $name,
+              'mobile' => $mobile,
+              'email' => $email_id,
+              'amount' => $amount,
+              'platform' => $platform,
+              'ip' => $ip,
+              'user_agent' => $user_agent,
+              'created_by' => $user_id,
+              'created_at' => date('Y-m-d h:m:s'),
+          ]);
+            if(!empty($txnCoreId)){
+               if(isset($response['cftoken']) && $response['status'] == 'OK'){
+                $data = array(
+                    'cftoken' => $response['cftoken']
+                );
+                return $data;
+               }
+            }
+
+        }catch (\Exception $e){
+            Log::error(__CLASS__." :: ".__FUNCTION__." Exception :: ".$e->getMessage());
+        }
+        Log::error(__CLASS__." :: ".__FUNCTION__." Cash free Payment initiate failed  for customer id $customer_id ");
+        return false;
+    }
+    
+    
+    
+    public static function validateBecomePrimechashFreePayment($request){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." Called");
+        $success = false;
+        $status = "FAILED";
+        $desc = "Payment failed";
+        
+        $orderId = $request->input('orderId');
+        $orderAmount = $request->input('orderAmount');
+        $referenceId = $request->input('referenceId');
+        $txStatus = $request->input('txStatus');
+        $paymentMode = $request->input('paymentMode');
+        $desc =$txMsg = $request->input('txMsg');
+        $txTime = $request->input('txTime');
+        $signature = $request->input('signature');
+        $dataPrevious = $orderId.$orderAmount.$referenceId.$txStatus.$paymentMode.$txMsg.$txTime;
+        
+        Log::debug(__CLASS__."::".__FUNCTION__." orderId got as $orderId");
+        Log::debug(__CLASS__."::".__FUNCTION__." OrderAmt got as $orderAmount");
+        Log::debug(__CLASS__."::".__FUNCTION__." txStatus got as $txStatus");
+        Log::debug(__CLASS__."::".__FUNCTION__." Paymentmode got as $paymentMode");
+        Log::debug(__CLASS__."::".__FUNCTION__." TxMsg got as $txMsg");
+        Log::debug(__CLASS__."::".__FUNCTION__." txnTime got as $txTime");
+        Log::debug(__CLASS__."::".__FUNCTION__." signature got as $signature");
+        Log::debug(__CLASS__."::".__FUNCTION__." Data got as $dataPrevious");
+        $razorpay_payment_id = $referenceId;
+        $txnId = htmlspecialchars(strip_tags($request->input('txn_id')));
+        
+        Log::debug(__CLASS__." :: ".__FUNCTION__." Order Id Received as $orderId");
+        $customer_id = auth()->user()->id;
+        Log::debug(__CLASS__." :: ".__FUNCTION__." Txn Id $txnId,  Customer Id : $customer_id");
+        $txnData = self::get_pending_transaction_by_txn_id($txnId, $customer_id);
+        
+        if(!isset($txnData->id)){
+            Log::error(__CLASS__." :: ".__FUNCTION__." Txn Data getting failed");
+            return returnResponse("Payment validation failed !!", HttpStatus::HTTP_ERROR);
+        }
+        $amount = "";
+        $razorpay_order_id = ""; $order_id = "";
+        $name = ""; $email = ""; $mobile = ""; $txn_status = "";
+        if(isset($txnData->razorpay_order_id)){
+            $razorpay_order_id = $txnData->razorpay_order_id; 
+        }
+        if(isset($txnData->order_id)){
+            $order_id = $txnData->order_id; 
+        }
+        if(isset($txnData->amount)){
+            $amount = $txnData->amount; 
+        }
+        if(isset($txnData->name)){
+            $name = $txnData->name; 
+        }
+        if(isset($txnData->email)){
+            $email = $txnData->email; 
+        }
+        if(isset($txnData->mobile)){
+            $mobile = $txnData->mobile; 
+        }
+        if(isset($txnData->status)){
+            $txn_status = $txnData->status; 
+        }
+         Log::debug(__CLASS__." :: ".__FUNCTION__." Order Id : $order_id, Txn Status : $txn_status");
+        if($txn_status != "PENDING"){
+            Log::error(__CLASS__." :: ".__FUNCTION__." Payment status is not pending !");
+            return returnResponse("Payment status is not pending !!", HttpStatus::HTTP_ERROR);
+        }
+        $activationHistoryData = CumtomerActHistory::where('id', '=', $order_id)
+                                    ->where('customer_id', '=', $customer_id)->first();
+        if (!empty($razorpay_payment_id))
+        {
+            $apiKey = "";
+            $apiSecret = "";
+            $razorpayKey = self::get_payment_methods_detail_value_by_key(4, "CASHFREE_KEY");
+            if(isset($razorpayKey->value)){
+                $apiKey = $razorpayKey->value;
+            }
+            $razorpaySecret = self::get_payment_methods_detail_value_by_key(4, "CASHFREE_SECRET");
+            if(isset($razorpaySecret->value)){
+                $apiSecret = $razorpaySecret->value;
+            }
+            
+            try
+            {
+                $hash_hmac = hash_hmac('sha256', $dataPrevious, $apiSecret, true) ;
+                $computedSignature = base64_encode($hash_hmac);
+                Log::debug(__CLASS__."::".__FUNCTION__." Signature got $signature");
+                Log::debug(__CLASS__."::".__FUNCTION__." Computed Signature got $computedSignature");
+                if ($signature == $computedSignature) {
+                   $success = true;
+                   Log::debug(__CLASS__."::".__FUNCTION__." Signature validated");
+                 } 
+            }
+            catch(\Exception $e)
+            {
+                $desc = 'Cash Free Error : ' . $e->getMessage();
+            }
+        }
+        
+        try{
+            DB::beginTransaction();
+            
+            if($success && $txStatus=='SUCCESS'){
+            $payment_status = "SUCCESS";
+            $desc = "Payment Success";
+            if(!self::update_transaction($customer_id, $customer_id, $order_id, $txnId, $payment_status, $desc, $razorpay_payment_id)){
+                Log::error(__CLASS__." :: ".__FUNCTION__." Payment validation failed  for customer id $customer_id !");
+                return returnResponse("Payment validation failed !!", HttpStatus::HTTP_ERROR);
+            }
+            $activationHistoryData->status = $payment_status;
+            if(!$activationHistoryData->save()){
+                Log::error(__CLASS__." :: ".__FUNCTION__." Customer Activation History ! status updating failed  for customer id $customer_id !");
+                return returnResponse("Customer Activation History ! status updating failed!!", HttpStatus::HTTP_ERROR);
+            }
+            
+//           
+            DB::commit();
+            return returnResponse("Become prime successfully !", HttpStatus::HTTP_OK, HttpStatus::HTTP_SUCCESS);
+        }
+        $payment_status = $txStatus;
+        self::update_transaction($customer_id, $customer_id, $order_id, $txnId, $payment_status, $desc, $razorpay_payment_id);
+        
+        $activationHistoryData->status = $payment_status;
+            if(!$activationHistoryData->save()){
+                Log::error(__CLASS__." :: ".__FUNCTION__." Customer Activation History ! status updating failed  for customer id $customer_id !");
+                DB::commit();
+                return returnResponse("Customer Activation History ! status updating failed!!", HttpStatus::HTTP_ERROR);
+            }
+            
+    }catch(\Exception $e)
+            {
+        Log::error(__CLASS__." :: ".__FUNCTION__." Exception occured ". $e->getMessage());
+        return returnResponse("Exception occured !!", HttpStatus::HTTP_ERROR);
+            }
+        
+        Log::error(__CLASS__." :: ".__FUNCTION__." Payment validation failed  for customer id $customer_id ");
+        return returnResponse("Payment validation failed !!", HttpStatus::HTTP_ERROR);
+    }
     
     
     
