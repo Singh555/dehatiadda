@@ -2580,8 +2580,6 @@ Team,
 
     public static function updateTeamCount($cust_info, $is_active = '', $level = 1) {
         Log::debug(__CLASS__ . "::" . __FUNCTION__ . " Called with customer id $cust_info->id and is active $is_active and level $level");
-
-
         try {
             if ($level > 11) {
                 return true;
@@ -2683,11 +2681,6 @@ Team,
                 return true;
             }
             Log::debug(__CLASS__." :: ".__FUNCTION__." child count is more than 3, parent level need to be updated !!!");
-            Log::debug(__CLASS__." :: ".__FUNCTION__." lets fetch the parent id from sponsor id ($cust_info->referred_by) for customer $cust_info->id !! ");
-            $parent_id = self::getParentCodeByReferralCode($cust_info->sponsor_id, 4, 1);
-            Log::debug(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id");
-            Log::debug(__CLASS__." :: ".__FUNCTION__." lets call pool income update with parent id $parent_id and child id $cust_info->id and sponsor id $cust_info->referred_by ");
-            Log::debug(__CLASS__." :: ".__FUNCTION__." club - 1 and level of member to be passed in function as 0");
             
             
 
