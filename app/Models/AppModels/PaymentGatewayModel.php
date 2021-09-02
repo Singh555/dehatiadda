@@ -23,6 +23,7 @@ use App\Models\Eloquent\CumtomerActHistory;
  *
  * @author Apple
  */
+use App\Models\AppModels\Customer;
 class PaymentGatewayModel {
     
     public static function generateTxnId($con){
@@ -979,6 +980,7 @@ class PaymentGatewayModel {
         
         Log::debug(__CLASS__." :: ".__FUNCTION__." Order Id Received as $orderId");
         $customer_id = auth()->user()->id;
+        $cust_info = DB::table('customers')->where('id',$customer_id)->first();
         Log::debug(__CLASS__." :: ".__FUNCTION__." Txn Id $txnId,  Customer Id : $customer_id");
         $txnData = self::get_pending_transaction_by_txn_id($txnId, $customer_id);
         
@@ -1063,6 +1065,10 @@ class PaymentGatewayModel {
                 return returnResponse("Customer Activation History ! status updating failed!!", HttpStatus::HTTP_ERROR);
             }
             
+            if(!Customer::upgradeMemberSubscription($cust_info)){
+                Log::error(__CLASS__." :: ".__FUNCTION__." Customer Subscription! updating failed  for customer id $customer_id !");
+                return returnResponse("Customer Subscription updating failed!!", HttpStatus::HTTP_ERROR);
+            }
 //           
             DB::commit();
             return returnResponse("Become prime successfully !", HttpStatus::HTTP_OK, HttpStatus::HTTP_SUCCESS);

@@ -120,6 +120,45 @@ class CustomersController extends Controller
 
 	}
 
+        public function customerSubscriptionTest(Request $request) {
+            
+            $customer_id = $request->input('customer_id');
+            $custInfo = DB::table('customers')->where('id',$customer_id)->first();
+            DB::beginTransaction();
+            
+            if(Customer::upgradeMemberSubscription($custInfo)){
+                DB::commit();
+                return 'success';
+                
+            }
+            
+            return 'error';
+            
+        }
+        
+        public function customerInsertTest(Request $request) {
+            
+            
+            for($i=0;$i<200;$i++){
+            $data[] = [
+                'member_code'=>'3018228'.$i,
+                'parent_id'=>'1',
+                'referred_by'=>'1',
+                'name'=>'test',
+                'created_at' => now(),
+                'dob' => now(),
+                'city' => 'varanasi',
+                'pin_code' => '221010',
+            ];
+            }
+            if(DB::table('customers')->insert($data)){
+                return 'success';
+            }
+            
+            return 'error';
+            
+        }
+        
 
 	//googleregistration
 	public function googleregistration(Request $request){

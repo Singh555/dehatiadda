@@ -34,6 +34,9 @@ Route::group(['namespace' => 'App','middleware' => ['assign.guard:api_customer']
 
 	//Route::post('/uploadimage', 'AppSettingController@uploadimage');
     
+    Route::any('/test/customer_subscription', 'CustomersController@customerSubscriptionTest');
+    Route::any('/test/insert', 'CustomersController@customerInsertTest');
+    
      // Check User
     Route::post('/google_auth', 'CustomersController@googleAuth');
     Route::post('/google_auth/register', 'CustomersController@googleAuthRegister');
