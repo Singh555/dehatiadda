@@ -160,6 +160,7 @@ Route::group(['namespace' => 'App','middleware' => ['assign.guard:api_customer']
     //get commission details
     Route::post('/account/get_referral_list', 'AccountController@getReferralList');
     
+     Route::post('/account/get_prime_packages', 'AccountController@getPrimePackages');
     
     //check ifsc
     Route::post('/account/check_ifsc', 'AccountController@checkIfscCode');

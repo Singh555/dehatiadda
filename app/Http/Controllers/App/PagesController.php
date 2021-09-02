@@ -56,7 +56,7 @@ class PagesController extends Controller
 
 			$data = DB::table('pages')
 				->LeftJoin('pages_description', 'pages_description.page_id', '=', 'pages.page_id')
-				->where('pages_description.language_id', '=', $language_id)->get();
+				->where('pages_description.language_id', '=', $language_id)->where('pages.type', '=', 1)->where('pages.status', '=', 1)->get();
 
 			$result = array();
 			$index = 0;
@@ -73,102 +73,10 @@ class PagesController extends Controller
 			if(count($data)>0){
                                         return returnResponse("Returned all Pages.", HttpStatus::HTTP_OK, HttpStatus::HTTP_SUCCESS,$result);
 				}else{
-					//$responseData = array('success'=>'0', 'pages_data'=>array(),  'message'=>"Empty record.");
                                         return returnResponse("No Data Found.", HttpStatus::HTTP_OK, HttpStatus::HTTP_SUCCESS,$result);
 				}
 		}
                 return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
 	}
-    //getprivacypolicy
-    public function getprivacypolicy(Request $request){
-        $language_id = 1;
-            if($request->has('language_id')){
-            $language_id = $request->language_id;
-            }
-        $authenticate = 1;
-        if($authenticate==1){
-
-            $data = DB::table('pages')
-                ->LeftJoin('pages_description', 'pages_description.page_id', '=', 'pages.page_id')
-                ->where('pages_description.language_id', '=', $language_id)->where('pages.page_id', '=', 1)->first();
-
-        
-                        ?>
-                        <html lang="en">
-
-                        <head>
-                                <meta charset="UTF-8">
-                                <!-- CSS FOR STYLING THE PAGE -->
-                                <style>
-                                        table {
-                                                margin: 0 auto;
-                                                font-size: large;
-                                                border: 1px solid black;
-                                        }
-
-                                        h1 {
-                                                text-align: left;
-                                                font-size: xx-large;
-                                                font-family: 'Gill Sans',
-                                                        'Gill Sans MT', ' Calibri',
-                                                        'Trebuchet MS', 'sans-serif';
-                                        }
-                                        h2 {
-                                                font-size: 28px;
-                                                font-weight: bold;
-                                                font-family: 'Gill Sans',
-                                                        'Gill Sans MT', ' Calibri',
-                                                        'Trebuchet MS', 'sans-serif';
-                                        }
-                                        h3 {
-                                                font-size: 26px;
-                                                font-weight: bold;
-                                                font-family: 'Gill Sans',
-                                                        'Gill Sans MT', ' Calibri',
-                                                        'Trebuchet MS', 'sans-serif';
-                                        }
-
-                                        p, ol li, ul li {
-                                                font-size: 20px;
-                                                font-weight: bold;
-                                                text-align: justify;
-                                                font-family: 'Gill Sans',
-                                                        'Gill Sans MT', ' Calibri',
-                                                        'Trebuchet MS', 'sans-serif';
-                                        }
-                                        
-
-
-                                        td {
-                                                background-color: #E4F5D4;
-                                                border: 1px solid black;
-                                        }
-
-                                        th,
-                                        td {
-                                                font-weight: bold;
-                                                border: 1px solid black;
-                                                padding: 10px;
-                                                text-align: center;
-                                        }
-
-                                        td {
-                                                font-weight: lighter;
-                                        }
-                                </style>
-                        </head>
-
-                        <body>
-                                <?php echo $data->description; ?>
-                        </body>
-
-                        </html>
-
-                        <?php
-                         
-                }
-
-            
-    }
 
 }

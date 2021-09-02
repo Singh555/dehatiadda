@@ -50,13 +50,19 @@ class AccountController extends Controller
         
         return Account::validatePrime($request);
     }
+  
+  // Get Prime Packages
+    public function getPrimePackages(Request $request){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." called");
+        return Account::getPrimePackages($request);
+    }
     
-    // create cartilo pin
+    // create pin
     public function createMPin(Request $request){
         Log::debug(__CLASS__." :: ".__FUNCTION__." called");
         return Account::createMPin($request);
     }
-    // create cartilo pin
+    // update pin
     public function updateMPin(Request $request){
         Log::debug(__CLASS__." :: ".__FUNCTION__." called");
         return Account::updateMPin($request);
