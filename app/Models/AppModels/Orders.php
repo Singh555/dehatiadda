@@ -23,6 +23,7 @@ use App\Helpers\HttpStatus;
 use App\Models\AppModels\PaymentGatewayModel;
 use App\Models\Eloquent\CartModel;
 use App\Models\Core\WalletModel;
+use App\Models\Eloquent\PaymentMethod;
 
 class Orders extends Model {
 
@@ -164,92 +165,49 @@ class Orders extends Model {
         if ($authenticate == 1) {
 
             $result = array();
-
-            $payments_setting = Orders::payments_setting_for_wallet($request);
-            if (isset($payments_setting->name)) {
-                $wallet = array(
-                    'environment' => '',
-                    'method' => 'wallet',
-                    'public_key' => '',
-                    'auth_token' => '',
-                    'api_key' => '',
-                    'api_secret' => '',
-                    'client_id' => '',
-                    'client_secret' => '',
-                    'name' => $payments_setting->name,
-                    'active' => $payments_setting->status,
-                    'payment_method' => 'wallet'
-                );
-                array_push($result, $wallet);
+            $for = "";
+            if($request->has('for')){
+                $for = htmlspecialchars(strip_tags($request->for));
             }
-            $razorpay_setting = Orders::payments_setting_for_razorpay($request);
-            if (isset($razorpay_setting['RAZORPAY_KEY']) && isset($razorpay_setting['RAZORPAY_KEY']->value)) {
-                if ($razorpay_setting['RAZORPAY_KEY']->environment == '0') {
-                    $razorpay_enviroment = 'Test';
-                } else {
-                    $razorpay_enviroment = 'Live';
+            $paymentMethods = PaymentMethod::where('status', '=', '1')
+            //->where('environment', '=', '1')
+              ->where('active', '=', '1');
+            if($for == "prime"){
+                $paymentMethods->where('prime', '=', '1');
+            }
+            $paymentMethods = $paymentMethods->with(['description', 'details'])
+            ->get();
+        
+            if(!empty($paymentMethods) and count($paymentMethods) > 0){
+                $i=0;
+                foreach ($paymentMethods as $obj) {
+                    $apiKey = ""; $apiSecret = "";
+                    if(!empty($obj->details)){
+                        foreach ($obj->details as $details) {
+                            if($details->key == "RAZORPAY_KEY"){
+                                $apiKey = $details->value;
+                            } else if($details->key == "RAZORPAY_SECRET"){
+                                $apiSecret = $details->value;
+                            } else if($details->key == "CASHFREE_KEY"){
+                                $apiKey = $details->value;
+                            } else if($details->key == "CASHFREE_SECRET"){
+                                $apiSecret = $details->value;
+                            }
+                        }
+                    }
+                    $row = array(
+                        'environment' => $obj->environment,
+                        'payment_method'=> $obj->payment_method,
+                        'api_key' => $apiKey,
+                        'api_secret' => $apiSecret,
+                        'name' => $obj->description->name,
+                        'status' => $obj->status,
+                        'is_default' => $obj->is_default,
+                    );
+                    $result[$i] = $row;
+                    $i++;
                 }
-
-                $razorpay = array(
-                    'method' => 'razorpay',
-                    'public_key' => $razorpay_setting['RAZORPAY_KEY']->value,
-                    'auth_token' => '',
-                    'api_key' => $razorpay_setting['RAZORPAY_KEY']->value,
-                    'api_secret' => $razorpay_setting['RAZORPAY_SECRET']->value,
-                    'client_id' => '',
-                    'client_secret' => '',
-                    'environment' => $razorpay_enviroment,
-                    'name' => $razorpay_setting['RAZORPAY_KEY']->name,
-                    'active' => $razorpay_setting['RAZORPAY_SECRET']->status,
-                    'payment_method' => 'razorpay',
-                );
-                array_push($result, $razorpay);
             }
-            $cashfree_setting = Orders::payments_setting_for_cashfree($request);
-           
-            if (isset($cashfree_setting['CASHFREE_KEY']) && isset($cashfree_setting['CASHFREE_KEY']->value)) {
-                if ($cashfree_setting['CASHFREE_KEY']->environment == '0') {
-                    $cashfree_enviroment = 'Test';
-                } else {
-                    $cashfree_enviroment = 'Live';
-                }
-
-                $cashFree = array(
-                    'method' => 'cash_free',
-                    'public_key' => $cashfree_setting['CASHFREE_KEY']->value,
-                    'auth_token' => '',
-                    'api_key' => $cashfree_setting['CASHFREE_KEY']->value,
-                    'api_secret' => $cashfree_setting['CASHFREE_SECRET']->value,
-                    'client_id' => '',
-                    'client_secret' => '',
-                    'environment' => $cashfree_enviroment,
-                    'name' => $cashfree_setting['CASHFREE_KEY']->name,
-                    'active' => $cashfree_setting['CASHFREE_SECRET']->status,
-                    'payment_method' => 'cash_free',
-                );
-                array_push($result, $cashFree);
-            }
-
-            $cod_setting = Orders::payments_setting_for_cod($request);
-            if (isset($cod_setting->name)) {
-                $cod = array(
-                    'environment' => '',
-                    'method' => 'cod',
-                    'public_key' => '',
-                    'auth_token' => '',
-                    'api_key' => '',
-                    'api_secret' => '',
-                    'client_id' => '',
-                    'client_secret' => '',
-                    'name' => $cod_setting->name,
-                    'active' => $cod_setting->status,
-                    'payment_method' => 'cod'
-                );
-                array_push($result, $cod);
-            }
-
-
-            //$responseData = array('success'=>'1', 'data'=>$result, 'message'=>"Payment methods are returned.");
             return returnResponse("Payment methods are returned.!", HttpStatus::HTTP_OK, HttpStatus::HTTP_SUCCESS, $result);
         }
 

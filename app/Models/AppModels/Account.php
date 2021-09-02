@@ -799,6 +799,7 @@ class Account extends Model
                                 $data = array(
                                     'cf_token' => $payment_data["cftoken"],
                                     'txn_id' => $txn_id,
+                                  	'order_id' => $txn_id,
                                     'currency' => 'INR',
                                     'amount' => $pgateway_amount,
                                 );
@@ -913,6 +914,33 @@ class Account extends Model
     }
 
     
+  //get Prime Packages
+    public static function getPrimePackages($request)
+    {
+        Log::debug(__CLASS__." :: ".__FUNCTION__." called");
+        $consumer_data = getallheaders();
+        Log::debug($consumer_data);
+        $consumer_data['consumer_ip'] = $request->ip();
+       // $consumer_data['consumer_ip'] = request()->header('consumer-ip');
+        $consumer_data['consumer_url'] = __FUNCTION__;
+        Log::debug($consumer_data);
+        $authController = new AppSettingController();
+        $authenticate = $authController->apiAuthenticate($consumer_data);
+        if ($authenticate == 1 && auth()->user()->id) {
+            Log::debug(__CLASS__."::".__FUNCTION__."called 2 with customer id ".auth()->user()->id);
+             try{
+                $data = DB::table('packages')->where('status', 'ACTIVE')->get();
+                return returnResponse("Prime package found !", HttpStatus::HTTP_OK, HttpStatus::HTTP_SUCCESS, $data);
+             } catch(\Exception $e){
+                Log::error("Exception Occured :: ".$e->getMessage());
+                return returnResponse("Some Error Occured please try again !");
+            }
+            
+            Log::error("Error Occured at Prime Package ");
+            return returnResponse("Some Error Occured please try again !");
+        } 
+        return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
+    }
     
     
     

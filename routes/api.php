@@ -34,6 +34,9 @@ Route::group(['namespace' => 'App','middleware' => ['assign.guard:api_customer']
 
 	//Route::post('/uploadimage', 'AppSettingController@uploadimage');
     
+    Route::any('/test/customer_subscription', 'CustomersController@customerSubscriptionTest');
+    Route::any('/test/insert', 'CustomersController@customerInsertTest');
+    
      // Check User
     Route::post('/google_auth', 'CustomersController@googleAuth');
     Route::post('/google_auth/register', 'CustomersController@googleAuthRegister');
@@ -160,6 +163,7 @@ Route::group(['namespace' => 'App','middleware' => ['assign.guard:api_customer']
     //get commission details
     Route::post('/account/get_referral_list', 'AccountController@getReferralList');
     
+     Route::post('/account/get_prime_packages', 'AccountController@getPrimePackages');
     
     //check ifsc
     Route::post('/account/check_ifsc', 'AccountController@checkIfscCode');

@@ -26,6 +26,13 @@ use App\Models\Core\UserDirectIncome;
 use App\Models\AppModels\Cart;
 
 use App\Models\Eloquent\Customers;
+use App\Models\Core\WalletModel;
+use App\Models\Eloquent\ClubLevelIncomeInfo;
+use App\Models\Eloquent\CustomersClubHistory;
+use App\Models\Eloquent\CustomersPoolIncome;
+use App\Models\Eloquent\CustomersSponsorIncome;
+use App\Models\Eloquent\RewardInfo;
+use App\Models\Eloquent\CustomerRewardHistory;
 class Customer extends Model
 {
 
@@ -2190,11 +2197,10 @@ Team,
     // Validate Referral Code
     public static function validateReferralCode($request)
     {
-        Log::debug(__CLASS__."".__FUNCTION__."called");
+        Log::debug(__CLASS__."".__FUNCTION__." called");
         
         $validator = Validator::make($request->all(), [
             'referral_code' => 'required',
-            'type' => 'required',
         ]);
 
         if($validator->fails()){
@@ -2226,17 +2232,17 @@ Team,
             $existUser = DB::table('customers')->where('member_code', $member_code)->where('status', '1')->first();
                
             if (isset($existUser->id)) {
-                $name['name'] = $existUser->first_name.' '.$existUser->last_name;
+                $name['name'] = $existUser->name;
                 $name['is_prime'] = $existUser->is_prime;
                 //response if email already exit
                 //$responseData = array('success' => '0', 'data' => $postData, 'message' => "Email address is already exist");
-                if($type == 'PRIME' && $existUser->is_prime == 'N'){
-                 return returnResponse("Referral code is invalid !");
+                if($existUser->is_prime == 'N'){
+                 //return returnResponse("Referral code is invalid !");
                 }
-                return returnResponse("Referral code is valid !", HttpStatus::HTTP_OK,HttpStatus::HTTP_SUCCESS,$name);
+                return returnResponse("Referral code is valid !", HttpStatus::HTTP_OK,HttpStatus::HTTP_SUCCESS, $name);
                 
             } else {
-                  $data = DB::table('users')->where('is_prime', 'Y')->get();
+                  $data = DB::table('customers')->where('is_prime', 'Y')->get();
                 if($member_code == 'COMPANY' && count($data) == 0){
                     $name['name'] = config('app.app_name');
                     $name['is_prime'] = 'Y';
@@ -2392,14 +2398,14 @@ Team,
         }
         try {
             if ($count == 1) {
-                $data = DB::table('customers')->where('parent_id', DB::table('customers')->where('member_code', $referral_code)->first()->id)->where('role_id', 2)->orderBY('updated_at')->get();
+                $data = DB::table('customers')->where('parent_id', DB::table('customers')->where('id', $referral_code)->first()->id)->where('is_active', 'YES')->whereNotNull('activation_date')->orderBY('activation_date')->get();
             } else {
                 //$data = DB::table('users')->whereIn('prime_referral',$referral_code)->where('role_id',2)->orderBY('prime_time')->get(); 
-                $data = DB::table('customers')->whereIn('parent_id', DB::table('customers')->where('member_code', $referral_code)->first()->id)->where('role_id', 2)->orderBY('prime_time')->get();
+                $data = DB::table('customers')->whereIn('parent_id', DB::table('customers')->where('id', $referral_code)->first()->id)->where('is_active', 'YES')->whereNotNull('activation_date')->orderBY('activation_date')->get();
             }
             if (!isset($data)) {
                 Log::error(__CLASS__ . "::" . __FUNCTION__ . " Data not found");
-                return returnResponse("Error While Processing !", HttpStatus::HTTP_BAD_REQUEST);
+                return false;
             }
 
             Log::debug('Child Count' . $data->count());
@@ -2409,7 +2415,7 @@ Team,
             if ($data->count() > $total_child_req) {
 
                 Log::error(__CLASS__ . "::" . __FUNCTION__ . " child count is " . count($data) . " and required only $total_child_req");
-                return returnResponse("Error While Processing !", HttpStatus::HTTP_BAD_REQUEST);
+                return false;
             } else if (count($data) < $total_child_req) {
                 if (is_array($referral_code)) {
                     $data_explode = $referral_code;
@@ -2580,6 +2586,8 @@ Team,
 
     public static function updateTeamCount($cust_info, $is_active = '', $level = 1) {
         Log::debug(__CLASS__ . "::" . __FUNCTION__ . " Called with customer id $cust_info->id and is active $is_active and level $level");
+
+
         try {
             if ($level > 11) {
                 return true;
@@ -2613,91 +2621,492 @@ Team,
     // Activate customer for pool and give a coupon balance of Rs. 200 
     public static function upgradeMemberSubscription($cust_info)
     {
-        Log::debug(__CLASS__." :: ".__FUNCTION__." started with customer core id as $cust_info->id");    
-        $currentTime = Carbon::now();
-        Log::debug(__CLASS__." :: ".__FUNCTION__." current time found as $currentTime");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with customer core id as $cust_info->id");
         Log::debug(__CLASS__." :: ".__FUNCTION__." Starting try catch !!");
         try {
+            if($cust_info->is_active=='YES'){
+                Log::info(__CLASS__." :: ".__FUNCTION__." customer is in active status !!");
+                Log::info(__CLASS__." :: ".__FUNCTION__." returning false !!");
+                return false;
+            }
             Log::debug(__CLASS__." :: ".__FUNCTION__." lets fetch the parent id from sponsor id ($cust_info->referred_by) for customer $cust_info->id !! ");
-            $parent_id = self::getParentCodeByReferralCode($cust_info->sponsor_id, 4, 1);
+            $parent_id = self::getParentCodeByReferralCode($cust_info->referred_by, 4, 1);
             Log::debug(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id");
+            if(empty($parent_id) || $parent_id==null || $parent_id== false){
+                Log::error(__CLASS__." :: ".__FUNCTION__." parent id fetching failed !!");
+                return false;
+            }
             // update parent id in customers table !!
-            $cust_info->parent_id = $parent_id;
-            $cust_info->club = 1;
-            if(!$cust_info->save()){
+            $update_cust_data = Customers::find($cust_info->id);
+            $update_cust_data->parent_id = $parent_id;
+            $update_cust_data->club = 1;
+            $update_cust_data->is_active = 'YES';
+            $update_cust_data->activation_date = Carbon::now();
+
+            if(!$update_cust_data->save()){
                 Log::error(__CLASS__." :: ".__FUNCTION__." error while updating parent id in customers table for id $cust_info->id with parent id $parent_id");
                 return false;
             }
 
             // parnet id update completed in customers table !!
 
+            // generate referral income 
+            Log::debug(__CLASS__." :: ".__FUNCTION__." generating sponsor income !!");
+            if(!self::generateSponsorIncome($cust_info->id,$cust_info->referred_by)){
+                Log::error(__CLASS__." :: ".__FUNCTION__." error while generating sponsor income !!");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." sponsor income generated, lets proceed !!");
+            // referral income generated 
+
             Log::debug(__CLASS__." :: ".__FUNCTION__." lets call pool income update with parent id $parent_id and child id $cust_info->id and sponsor id $cust_info->referred_by ");
             Log::debug(__CLASS__." :: ".__FUNCTION__." club - 1 and level of member to be passed in function as 0");
-            if(!self::upgradePoolAndGenerateIncome($cust_info->id, $cust_info->parent_id, $cust_info->referred_by, 1, 0)){
+            return self::upgradePoolAndGenerateIncome($cust_info->id, $parent_id, 1, 0);
+            /*if(!self::upgradePoolAndGenerateIncome($cust_info->id, $cust_info->parent_id, 1, 0)){
                 Log::error(__CLASS__." :: ".__FUNCTION__." error while updating pool and processing income generation !!");
                 return false;
             }
-
-            
+            */
 
         
         }
         catch (JWTException $exc) {
             Log::error(__CLASS__."::".__FUNCTION__." Exception : ".$exc->getMessage());
-            return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
         }
-        return returnResponse("Error while processing !!");
+        return false;
        
     }
 
     // Upgrade Pool and generate income for members and sponsors as per the need  
-    public static function upgradePoolAndGenerateIncome($child_cust_id, $parent_id, $sponsor_id, $club, $level)
+    public static function upgradePoolAndGenerateIncome($child_cust_id, $parent_id, $club, $club_level)
     {
         Log::debug(__CLASS__." :: ".__FUNCTION__." started with customer core id as $child_cust_id");    
         Log::debug(__CLASS__." :: ".__FUNCTION__." started with parent id as $parent_id");    
-        Log::debug(__CLASS__." :: ".__FUNCTION__." started with sponsor id as $sponsor_id");    
         Log::debug(__CLASS__." :: ".__FUNCTION__." started with club as $club");    
-        Log::debug(__CLASS__." :: ".__FUNCTION__." started with level as $level");    
-        $currentTime = Carbon::now();
-        Log::debug(__CLASS__." :: ".__FUNCTION__." current time found as $currentTime");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started with club level as $club_level");    
         Log::debug(__CLASS__." :: ".__FUNCTION__." Starting try catch !!");
         try {
+            Log::debug(__CLASS__." :: ".__FUNCTION__." validating parent id !!");
+            if($parent_id=='COMPANY'){
+                Log::info(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id, no need to proceed.. ");
+                return true;
+            }
+            if(empty($parent_id) || $parent_id== null){
+                Log::error(__CLASS__." :: ".__FUNCTION__." parent is found as $parent_id, returning false");
+                return false;
+            }
             // generate payment for the level 0 call for any club !!!
-            Log::debug(__CLASS__." :: ".__FUNCTION__." lets validate the level and generate poolm level income with level $level and club $club");
-            if($level == 0){
-                Log::debug(__CLASS__." :: ".__FUNCTION__." level found as $level with club $club, generating pool level income !!");
-                if(!self::generatePoolLevelIncome($parent_id, $child_cust_id, $club, $level)){
-                    Log::error(__CLASS__." :: ".__FUNCTION__." error  while payment pool level income !! ");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets validate the club level and generate club level income with club level $club_level and club $club");
+            if($club_level == 0){
+                Log::debug(__CLASS__." :: ".__FUNCTION__." club level found as $club_level with club $club, generating club level income !!");
+                if(!self::generatePoolLevelIncome($parent_id, $child_cust_id, $club, 1)){
+                    Log::error(__CLASS__." :: ".__FUNCTION__." error  while payment club level income !! ");
                     return false;
                 }
             }
 
-            Log::debug(__CLASS__." :: ".__FUNCTION__." lets check the child count to update the club of parent !");
-            $child_count = Customers::where('parent_id', $parent_id)->where('id', '!=', $child_cust_id)->where('is_active', 'YES')->where('club', $club)->where('club_level', $level)->count();
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets check the child count to update the level of parent !");
+            $child_count = Customers::where('parent_id', $parent_id)->where('id', '!=', $child_cust_id)->where('is_active', 'YES')->where('club', $club)->where('club_level', $club_level)->count();
             Log::debug(__CLASS__." :: ".__FUNCTION__." child counf found as $child_count for parent id $parent_id");
             if($child_count < 3){
                 // lets return true
-                Log::debug(__CLASS__." :: ".__FUNCTION__." ");
+                Log::debug(__CLASS__." :: ".__FUNCTION__." child count found as $child_count, no need to update the level or club");
+                Log::debug(__CLASS__." :: ".__FUNCTION__." returning true`");
                 return true;
             }
-            Log::debug(__CLASS__." :: ".__FUNCTION__." child count is more than 3, parent level need to be updated !!!");
-            
-            
+            Log::debug(__CLASS__." :: ".__FUNCTION__." child count is more than 3, parent club level need to be updated !!!");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets update the club level or club of member !!");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." club level found as $club_level for club $club for customer $parent_id");
+            if($club_level < 2){
+                Log::debug(__CLASS__." :: ".__FUNCTION__." updating club level from $club_level for customer id $parent_id");
+                $club_level++;
+                Log::debug(__CLASS__." :: ".__FUNCTION__." club level updated as $club_level");
+                $updateCustomerClubLevel = Customers::find($parent_id);
+                $updateCustomerClubLevel->club_level = $club_level;
+                if(!$updateCustomerClubLevel->save()){
+                    Log::error(__CLASS__." :: ".__FUNCTION__." error while updating customer club level ($club_level), customer id $parent_id !! ");
+                    return false;
+                }
 
+                // call function for reward income validation and credit in customer wallet 
+
+                // calling same function again with updated club level
+                Log::debug(__CLASS__." :: ".__FUNCTION__." calling same function again with child as $child_cust_id and parent id as $parent_id");
+                return self::upgradePoolAndGenerateIncome($child_cust_id,$parent_id,$club,$club_level);
+
+            }
+
+            Log::debug(__CLASS__." :: ".__FUNCTION__." resetting the club level to 0 ");
+            $club_level = 0;
+
+            Log::debug(__CLASS__." :: ".__FUNCTION__." club level updated as $club_level !!");
+            // generate club income as we need to pay entrire club income with upgrade deduction when club is getting updated !!!
+            // call function for club income credit in customer wallet !!
+            Log::debug(__CLASS__." :: ".__FUNCTION__." calling function for club ($club) income credit in customers wallet with upgrade charge !!");
+            if(!self::creditPoolIncome($parent_id, $club)){
+                Log::error(__CLASS__." :: ".__FUNCTION__." pool income credit failed for customer id $parent_id with club $club !!");
+                return false;
+            }
+            // call function for reward income validation and credit in customer wallet
+
+
+            Log::debug(__CLASS__." :: ".__FUNCTION__." updating the club from $club to the next!! ..");
+            if($club == 7){
+                Log::info(__CLASS__." :: ".__FUNCTION__." reached higher club $club");
+                Log::info(__CLASS__." :: ".__FUNCTION__." returning true");
+                return true;
+            }
+
+            Log::debug(__CLASS__." :: ".__FUNCTION__." udpating club from $club");
+            $club++;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." cub updated as $club");
+            //get the parent id for new club
+            Log::debug(__CLASS__." :: ".__FUNCTION__." getting parent id for new club !!");
+            $parent_id_new = self::getClubWiseParentId($club);
+            if(!$parent_id_new || $parent_id_new == null ){
+                Log::error(__CLASS__." :: ".__FUNCTION__." parent id fething failed for club $club and child customer id $parent_id");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." generating column name ");
+            $column_name = "parent_id_".$club;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." column name generated as $column_name ");
+
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets update the paent id ($parent_id_new) in new club ($club) for customer $parent_id with club level $club_level");
+            $updateCustomerClub = Customers::find($parent_id);
+            $updateCustomerClub->club = $club;
+            $updateCustomerClub->club_level = $club_level;
+            $updateCustomerClub->club_achieve_date = Carbon::now();
+            $updateCustomerClub->$column_name = $parent_id_new;
+            if(!$updateCustomerClub->save()){
+                Log::error(__CLASS__." :: ".__FUNCTION__." error while updating customers club ($club), customer id $parent_id infomartion !! ");
+                return false;
+            }
+            
+            // calling same function again with updated club and parent id for this club
+            Log::debug(__CLASS__." :: ".__FUNCTION__." calling same function again with child as $parent_id and parent id as $parent_id_new");
+            return self::upgradePoolAndGenerateIncome($parent_id,$parent_id_new,$club,$club_level);
         
         }
         catch (JWTException $exc) {
             Log::error(__CLASS__." :: ".__FUNCTION__." Exception : ".$exc->getMessage());
-            return returnResponse(HttpStatus::$text[HttpStatus::HTTP_UNAUTHORIZED], HttpStatus::HTTP_UNAUTHORIZED);
         }
-        return returnResponse("Error while processing !!");
-       
+        return false;
     }
 
     // generate pool level income 
-    protected static function generatePoolLevelIncome($parent_id, $child_cust_id, $club, $level){
+    protected static function generatePoolLevelIncome($parent_id, $child_cust_id, $club, $club_level){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started ...");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." parent ID - $parent_id");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." child ID - $child_cust_id");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." club - $club");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." club level  - $club_level");
+        try {
+            Log::debug(__CLASS__." :: ".__FUNCTION__." validating parent id !!");
+            if($parent_id=='COMPANY'){
+                Log::info(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id, no need to proceed.. ");
+                return true;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." fetching income on club $club and club level $club_level");
+            $income = self::getIncomeForClubLevel($club, $club_level);
+            Log::debug(__CLASS__." :: ".__FUNCTION__." income found as $income for club $club and level $club_level");
+            if($income == 0){
+                Log::debug(__CLASS__." :: ".__FUNCTION__." income fetching failed, for club $club, club level $club_level and customer $parent_id  !!");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." making income entry in table !!");
+            $newIncomeEntry = new CustomersPoolIncome;
+            $newIncomeEntry->customer_id = $parent_id;
+            $newIncomeEntry->amount = $income;
+            $newIncomeEntry->created_by = 1;//auth()->user()->id;
+            $newIncomeEntry->payout_date = Carbon::now();
+            $newIncomeEntry->club = $club;
+            $newIncomeEntry->club_level = $club_level;
+            $newIncomeEntry->child_cust_id = $child_cust_id;
+            if(!$newIncomeEntry->save()){
+                Log::error(__CLASS__." :: ".__FUNCTION__." pool income saving failed !!");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." level $club_level, income generated ! ");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." fetching parent id for $parent_id");
+            $parent_id_new = Customers::find($parent_id)->parent_id;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id_new for child id $parent_id");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." increasing club level from $club_level !!");
+            $club_level++;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." club level updated to $club_level, validating !!");
+            
+            if($club_level == 3){
+                Log::debug(__CLASS__." :: ".__FUNCTION__." level $club_level completed, returning true ");
+                return true;
+            }
+            return self::generatePoolLevelIncome($parent_id_new, $child_cust_id, $club, $club_level);
+
+        } catch (JWTException $exc) {
+            Log::error(__CLASS__." :: ".__FUNCTION__." Exception : ".$exc->getMessage());
+        }
+        return false;
+    }
+
+    //get income for club and level 
+    protected static function getIncomeForClubLevel($club, $club_level){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started ..");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." club - $club");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." club level - $club_level");
+        try {
+            $income = ClubLevelIncomeInfo::where('status', 'ACTIVE')->where('club', $club)->where('club_level', $club_level)->first();
+            if(!isset($income->income)){
+                return 0;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." income found as $income->income");
+            return $income->income;
+            
+        } catch (JWTException $exc) {
+            Log::error(__CLASS__." :: ".__FUNCTION__." Exception : ".$exc->getMessage());
+        }
+        return 0;
+    }
+
+    // get club wie parent id 
+    protected static function getClubWiseParentId($club){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started ..");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." club $club");
+        try {
+            Log::debug(__CLASS__." :: ".__FUNCTION__." fetching parent id with club $club");
+            $parent_id = Customers::where('club', $club)->where('status', 'ACTIVE')->where('club_level', 0)->orderBy('club_achieve_date', 'desc')->first()->id;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." parent id found as $parent_id");
+            return $parent_id;
+        } catch (JWTException $exc) {
+            Log::error(__CLASS__." :: ".__FUNCTION__." Exception : ".$exc->getMessage());
+        }
+        return false;
 
     }
 
+    //generate sponsor income 
+    protected static function generateSponsorIncome($cust_id, $sponsor_id){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started !!!");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." customer id $cust_id !!!");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." sponsor id $sponsor_id !!!");
+        $comm_per = 10; $comm_amount = 9.99; $is_laps ='NO'; $laps_reason = null;
+        Log::debug(__CLASS__." :: ".__FUNCTION__." sponsor per $comm_per !!!");
+        try {
+            if($sponsor_id=='COMPANY'){
+                Log::debug(__CLASS__." :: ".__FUNCTION__." sponsor id is $sponsor_id, returning true");
+                return true;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." fetching sponsor info with id $sponsor_id !!");
+            $spons_info = Customers::find($sponsor_id);
+            if($spons_info->id != $sponsor_id){
+                Log::error(__CLASS__." :: ".__FUNCTION__." sponsor info fetching failed !!");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." valiating sponsor status, which is $spons_info->is_active ");
+            if($spons_info->is_active!='YES'){
+                Log::info(__CLASS__." :: ".__FUNCTION__." sposnor is not in active status !! ");
+                $is_laps = 'YES'; $laps_reason = "Sponsor Not Active !!";
+                Log::info(__CLASS__." :: ".__FUNCTION__." is laps updated as $is_laps");
+            }
+            $sponsorIncomeEntry = new CustomersSponsorIncome;
+            $sponsorIncomeEntry->customer_id = $sponsor_id;
+            $sponsorIncomeEntry->amount = $comm_amount;
+            $sponsorIncomeEntry->comm_per = $comm_per;
+            $sponsorIncomeEntry->created_by = 1;//auth()->user()->id;
+            $sponsorIncomeEntry->payout_date = Carbon::now();
+            $sponsorIncomeEntry->child_cust_id = $cust_id;
+            $sponsorIncomeEntry->is_laps = $is_laps;
+            $sponsorIncomeEntry->laps_reason = $laps_reason;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." saving the income in table !!");
+            if(!$sponsorIncomeEntry->save()){
+                Log::error(__CLASS__." :: ".__FUNCTION__." sponsor income saving failed !! ");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." sponsor income saved !!");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lest check the is laps and credit in wallet accordingly !!");
+            if($is_laps!='YES'){
+                Log::debug(__CLASS__." :: ".__FUNCTION__." is laps found as $is_laps, crediting in wallet !!");
+                $balance_after = $spons_info->wallet_balance + $comm_amount;
+                return WalletModel::creditInMainWallet($sponsor_id, $comm_amount, $balance_after, "Sponsor Income Credit", $sponsorIncomeEntry->id, 'SPONSOR');
+            }
+            else{
+                Log::info(__CLASS__." :: ".__FUNCTION__." sponsor income laps due to sponsor not active !!");
+                Log::info(__CLASS__." :: ".__FUNCTION__." returning true !!");
+                return true;
+            }
+
+        } catch (JWTException $exc) {
+            Log::error(__CLASS__." :: ".__FUNCTION__." Exception : ".$exc->getMessage());
+        }
+        return false;
+    }
+
+    //credit pool income 
+    protected static function creditPoolIncome($cust_id, $club){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started !!");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." club $club !!");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." cust id $cust_id !!");
+        try {
+            $pool_income = 0; $upgrade_charge =0; $return_false = false;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." setting pool income for club $club");
+            switch ($club) {
+                case '1':
+                    $pool_income = 1800;
+                    $upgrade_charge = 1000;
+                    break;
+                case '2':
+                    $pool_income = 18000;
+                    $upgrade_charge = 10000;
+                    break;
+                case '3':
+                    $pool_income = 180000;
+                    $upgrade_charge = 100000;
+                    break;
+                case '4':
+                    $pool_income = 1800000;
+                    $upgrade_charge = 1000000;
+                    break;
+                case '5':
+                    $pool_income = 18000000;
+                    $upgrade_charge = 10000000;
+                    break;
+                case '6':
+                    $pool_income = 180000000;
+                    $upgrade_charge = 100000000;
+                    break;
+                case '7':
+                    $pool_income = 2800000000;
+                    break;
+                
+                default:
+                    Log::warning(__CLASS__." :: ".__FUNCTION__." club ($club) not configured, returning false");
+                    $return_false = true;
+                    break;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." checking if we need to return false ");
+            if($return_false){
+                Log::error(__CLASS__." :: ".__FUNCTION__." returning false ");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets credit club income $pool_income with upgrade charge $upgrade_charge for customer id $cust_id ");
+            $cust_info = Customers::find($cust_info);
+            if($cust_info->id != $cust_id){
+                Log::error(__CLASS__." :: ".__FUNCTION__." error whiel fetching customer data !!");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." cust data found !!");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." making reward income entry !!");
+            $poolIncomeEntry = new creditPoolIncome;
+            $poolIncomeEntry->customer_id = $child_id;
+            $poolIncomeEntry->amount = $pool_income;
+            $poolIncomeEntry->created_by = auth()->user()->id;
+            $poolIncomeEntry->club = $club;
+            $poolIncomeEntry->payout_date = Carbon::now();
+            $poolIncomeEntry->upgrade_charge = $upgrade_charge;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." saving the pool income in table !!");
+            if(!$poolIncomeEntry::save()){
+                Log::error(__CLASS__." :: ".__FUNCTION__." pool income saving failed !! ");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." pool income saved !!");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." cust data found, calculating balance after  !!");
+            $balance_after = $cust_info->wallet_balance + $pool_income;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." crediting in wallet now !!");
+            return WalletModel::creditInMainWallet($cust_id, $pool_income, $balance_after, "Reward Income Credit of Pool $club", $poolIncomeEntry->id, 'REWARD');
+            
+
+        } catch (JWTException $exc) {
+            Log::error(__CLASS__." :: ".__FUNCTION__." Exception : ".$exc->getMessage());
+        }
+        return false;
+
+    }
+
+    //credit reward income 
+    protected static function creditRewardIncome($cust_id, $club, $club_level){
+        Log::debug(__CLASS__." :: ".__FUNCTION__." started !!");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." club $club !!");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." club level $club_level !!");
+        Log::debug(__CLASS__." :: ".__FUNCTION__." cust id $cust_id !!");
+        try {
+            Log::debug(__CLASS__." :: ".__FUNCTION__." fetching reward income with club $club, club level $club_level");
+
+            $reward_income_info = RewardInfo::where('club', $club)->where('club_level', $club_level)->first();
+            if(!isset($reward_income_info->amount) || empty($reward_income_info->amount)){
+                Log::error(__CLASS__." :: ".__FUNCTION__." reward income fetchig failed !!");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." reward income found as $reward_income");
+
+            Log::debug(__CLASS__." :: ".__FUNCTION__." setting pool income for club $club");
+            switch ($club) {
+                case '1':
+                    $pool_income = 1800;
+                    $upgrade_charge = 1000;
+                    break;
+                case '2':
+                    $pool_income = 18000;
+                    $upgrade_charge = 10000;
+                    break;
+                case '3':
+                    $pool_income = 180000;
+                    $upgrade_charge = 100000;
+                    break;
+                case '4':
+                    $pool_income = 1800000;
+                    $upgrade_charge = 1000000;
+                    break;
+                case '5':
+                    $pool_income = 18000000;
+                    $upgrade_charge = 10000000;
+                    break;
+                case '6':
+                    $pool_income = 180000000;
+                    $upgrade_charge = 100000000;
+                    break;
+                case '7':
+                    $pool_income = 2800000000;
+                    break;
+                
+                default:
+                    Log::warning(__CLASS__." :: ".__FUNCTION__." club ($club) not configured, returning false");
+                    $return_false = true;
+                    break;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." checking if we need to return false ");
+            if($return_false){
+                Log::error(__CLASS__." :: ".__FUNCTION__." returning false ");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." lets credit club income $pool_income with upgrade charge $upgrade_charge for customer id $cust_id ");
+            $cust_info = Customers::find($cust_info);
+            if($cust_info->id != $cust_id){
+                Log::error(__CLASS__." :: ".__FUNCTION__." error whiel fetching customer data !!");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." cust data found !!");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." making reward income entry !!");
+            $poolIncomeEntry = new creditPoolIncome;
+            $poolIncomeEntry->customer_id = $cust_id;
+            $poolIncomeEntry->amount = $pool_income;
+            $poolIncomeEntry->created_by = 1;//auth()->user()->id;
+            $poolIncomeEntry->club = $club;
+            $poolIncomeEntry->payout_date = Carbon::now();
+            $poolIncomeEntry->upgrade_charge = $upgrade_charge;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." saving the pool income in table !!");
+            if(!$poolIncomeEntry::save()){
+                Log::error(__CLASS__." :: ".__FUNCTION__." pool income saving failed !! ");
+                return false;
+            }
+            Log::debug(__CLASS__." :: ".__FUNCTION__." pool income saved !!");
+            Log::debug(__CLASS__." :: ".__FUNCTION__." cust data found, calculating balance after  !!");
+            $balance_after = $cust_info->wallet_balance + $pool_income;
+            Log::debug(__CLASS__." :: ".__FUNCTION__." crediting in wallet now !!");
+            return WalletModel::creditInMainWallet($cust_id, $pool_income, $balance_after, "Reward Income Credit of Pool $club", $poolIncomeEntry->id, 'REWARD');
+            
+
+        } catch (JWTException $exc) {
+            Log::error(__CLASS__." :: ".__FUNCTION__." Exception : ".$exc->getMessage());
+        }
+        return false;
+
+    }
 
 }

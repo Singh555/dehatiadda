@@ -31,7 +31,7 @@ class WalletModel {
         Log::debug(__CLASS__." :: ".__FUNCTION__." txn mapping type $order_type");
         Log::debug(__CLASS__." :: ".__FUNCTION__." txn with customer id $txn_user_id");
         try {
-            $insert   =   DB::table('wallet_txn')->insert(['user_id'=>$customer_id,'txn_user_id'=>$txn_user_id,'txn_amount'=>$txn_amount,'txn_type'=>'CREDIT','txn_desc'=>$txn_desc,'txn_date'=>$date,'balance_after'=>$balance_after,'order_id'=>$order_id,'order_type'=>$order_type,'created_by'=>$user, 'created_at'=>$date]);
+            $insert   =   DB::table('wallet_txn')->insert(['customer_id'=>$customer_id,'txn_customer_id'=>$txn_user_id,'txn_amount'=>$txn_amount,'txn_type'=>'CREDIT','txn_desc'=>$txn_desc,'txn_date'=>$date,'balance_after'=>$balance_after,'reference_no'=>$order_id,'reference_with'=>$order_type,'created_by'=>$user, 'created_at'=>$date]);
             if($insert){
                 Log::debug(__CLASS__." :: ".__FUNCTION__." txn saved lets update the balance in users table");
                 return self::mainWalletBalanceUpdateInUsersTbl($customer_id, $balance_after);
@@ -56,7 +56,7 @@ class WalletModel {
         Log::debug(__CLASS__." :: ".__FUNCTION__." txn mapping type $order_type");
         Log::debug(__CLASS__." :: ".__FUNCTION__." txn with customer id $txn_user_id");
         try {
-            $insert = DB::table('wallet_txn')->insert(['user_id'=>$customer_id,'txn_user_id'=>$txn_user_id,'txn_amount'=>$txn_amount,'txn_type'=>'DEBIT','txn_desc'=>$txn_desc,'txn_date'=>$date,'balance_after'=>$balance_after,'order_id'=>$order_id,'order_type'=>$order_type,'created_by'=>$user, 'created_at'=>$date]);
+            $insert = DB::table('wallet_txn')->insert(['customer_id'=>$customer_id,'txn_customer_id'=>$txn_user_id,'txn_amount'=>$txn_amount,'txn_type'=>'DEBIT','txn_desc'=>$txn_desc,'txn_date'=>$date,'balance_after'=>$balance_after,'reference_no'=>$order_id,'reference_with'=>$order_type,'created_by'=>$user, 'created_at'=>$date]);
             if($insert){
                 Log::debug(__CLASS__." :: ".__FUNCTION__." txn saved lets update the balance in users table");
                 return self::mainWalletBalanceUpdateInUsersTbl($customer_id, $balance_after);
