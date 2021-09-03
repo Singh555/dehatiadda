@@ -2,6 +2,12 @@
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
-        <group/>
+        <group>
+            <file>file:/E:/server/htdocs/dehatiadda.com/routes/api.php</file>
+            <file>file:/E:/server/htdocs/dehatiadda.com/app/Models/AppModels/Customer.php</file>
+            <file>file:/E:/server/htdocs/dehatiadda.com/storage/logs/laravel-2021-09-02.log</file>
+            <file>file:/E:/server/htdocs/dehatiadda.com/app/Http/Controllers/App/CustomersController.php</file>
+            <file>file:/E:/server/htdocs/dehatiadda.com/app/Models/Core/WalletModel.php</file>
+        </group>
     </open-files>
 </project-private>

@@ -763,6 +763,13 @@ class Account extends Model
                 return returnResponse("You Are Already upgraded !");
             }
             
+            
+            $activationHistoryData = CumtomerActHistory::where('customer_id', '=', $user->id)->orderBY('id','desc')->first();
+            if(isset($activationHistoryData->status) && $activationHistoryData->status =='PENDING' || $activationHistoryData->status =='SUCCESS'){
+                Log::error(__CLASS__." :: ".__FUNCTION__." user already paid to become prime member !!");
+                return returnResponse("You have already paid !");
+            }                      
+            
             Log::debug(__CLASS__." :: ".__FUNCTION__." starting try catch");
             $txn_id = generateGatewayTxnId();
             if(empty($txn_id)){

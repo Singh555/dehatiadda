@@ -123,27 +123,40 @@ class CustomersController extends Controller
         public function customerSubscriptionTest(Request $request) {
             
             $customer_id = $request->input('customer_id');
-            $custInfo = DB::table('customers')->where('id',$customer_id)->first();
-            DB::beginTransaction();
+            $startcount = 1365;
+            $endcount = $startcount+1;
+            
+            for($i=$startcount;$i<$endcount;$i++){
+               $customer_id = $i;
+                $custInfo = DB::table('customers')->where('id',$customer_id)->first();
+                DB::beginTransaction();
+            
+            if(!isset($custInfo->id)){
+                return 'customer not exists';
+            }
             
             if(Customer::upgradeMemberSubscription($custInfo)){
                 DB::commit();
-                return 'success';
+               // return 'success';
                 
             }
             
-            return 'error';
             
+
+            }
+            return 'success';
+                        
         }
         
         public function customerInsertTest(Request $request) {
             
             
-            for($i=0;$i<200;$i++){
+            
+            for($i=5000;$i<12000;$i++){
             $data[] = [
-                'member_code'=>'3018228'.$i,
-                'parent_id'=>'1',
-                'referred_by'=>'1',
+                'member_code'=>'3018201199399'.$i,
+                'parent_id'=>null,
+                'referred_by'=>'3',
                 'name'=>'test',
                 'created_at' => now(),
                 'dob' => now(),

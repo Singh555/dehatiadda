@@ -45,6 +45,12 @@ return [
     'sender_id' => 'kingaz',
     'sms_url_link' => 'https://api.textlocal.in/send/',
     'send_sms_company_name' => 'King A2Z',
+    
+    'tds_per' => '5',
+    'admin_per' => '10',
+    'repurchase_per' => '25',
+    
+    
     /*
     |--------------------------------------------------------------------------
     | Application Environment
