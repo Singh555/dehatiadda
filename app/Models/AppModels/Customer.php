@@ -173,7 +173,7 @@ class Customer extends Model
                     'picture' => 'nullable',
                     'google_id' => 'nullable',
                     'is_new_user' => 'nullable',
-                    'referral_code' => 'nullable',
+                    'referral_code' => 'required',
                     'mobile_no' => 'required|string|between:10,12',
                     'dob' => 'required|date',
                     'city' => 'required',
@@ -231,7 +231,14 @@ class Customer extends Model
                     Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " cerating new user in system");
                     $referred_by = null;
                     Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " default referral code set as $referred_by");
-                    if ($request->has('referral_code') and ! empty($request->referral_code)) {
+                    if($request->referral_code == 'COMPANY'){
+                        if(Customers::count() > 0){
+                            return returnResponse("Invalid Referral Code !!");
+                        }
+                         $referred_by = $request->referral_code;
+                    }elseif($request->has('referral_code') and ! empty($request->referral_code)) {
+                        
+                        
                         Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " fetching code referral code which is $request->referral_code");
                         $referred_by_new = self::getCoreIdFromMemberCode($request->referral_code);
                         Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " referral code found from databse id $referred_by_new");
@@ -262,7 +269,7 @@ class Customer extends Model
                     Log::debug(__CLASS__ . " :: " . __FUNCTION__ . " preparing customer data for save");
                     $customer = new Customers;
                     $customer->member_code = $member_code;
-                    $customer->parent_id = $referred_by;
+                    $customer->parent_id = null;
                     $customer->referred_by = $referred_by;
                     $customer->name = $name;
                     $customer->avatar = $picture;
@@ -289,7 +296,7 @@ class Customer extends Model
                     $customerData = $customer->id;
                     
                     Log::debug(__CLASS__."::".__FUNCTION__." Updating Sponsor Count and active level");
-                    if(!self::updateSponsorCount($customer)){
+                    if(!self::updateSponsorCount($referred_by)){
                          Log::error(__CLASS__."::".__FUNCTION__." Error Updating Sponsor Count and active level for with customer id $customer->id ");
                         return returnResponse('Error Updating Sponsor Count');
                     }
@@ -2552,9 +2559,9 @@ Team,
         return false;
     }
 
-     public static function updateSponsorCount($cust_info, $is_active = null) {
-        Log::debug(__CLASS__ . "::" . __FUNCTION__ . " Called with customer id $cust_info->parent_id and is active $is_active");
-        if (empty($cust_info->parent_id) || $cust_info->parent_id == null) {
+     public static function updateSponsorCount($sponser_id, $is_active = null) {
+        Log::debug(__CLASS__ . "::" . __FUNCTION__ . " Called with sponser id $sponser_id ");
+        if ( $sponser_id== 'COMPANY') {
             return true;
         }
         try {
@@ -2564,29 +2571,12 @@ Team,
                 $column_name = $is_active . '_' . $column_name;
                 $column_name_level = $is_active . '_' . $column_name_level;
             }
-            $parent_info = Customers::find($cust_info->parent_id);
             
-            
-            if ($parent_info->is_boosted == 'N' && $parent_info->is_active =='YES') {
-                $current_sponsor_count = Customers::where('parent_id',$parent_info->id)->where('id','!=',$cust_info->id)->whereDate('created_at','>=',Carbon::now()->subDays(5)->toDateTimeString())->count();
-            
-                if ($current_sponsor_count >= 10) {
-                    if (!Customers::where('id', $parent_info->id)->update(['is_boosted' => 'Y'])) {
-                        Log::error(__CLASS__ . "::" . __FUNCTION__ . " Error updating is_boosted for customer id  $parent_info->id");
-                        return false;
-                    }
-                }
-            }
-            if (!Customers::where('id', $parent_info->id)->increment($column_name)) {
-                Log::error(__CLASS__ . "::" . __FUNCTION__ . " Error updating $column_name for customer id  $parent_info->id");
+            if (!Customers::where('id', $sponser_id)->increment($column_name)) {
+                Log::error(__CLASS__ . "::" . __FUNCTION__ . " Error updating $column_name for sponser id  $sponser_id");
                 return false;
             }
-            if ($parent_info->level < 11) {
-                if (!Customers::where('id', $parent_info->id)->increment($column_name_level)) {
-                    Log::error(__CLASS__ . "::" . __FUNCTION__ . " Error updating $column_name for customer id  $parent_info->id");
-                    return false;
-                }
-            }
+            
             return true;
         } catch (\Exception $e) {
             Log::error(__CLASS__ . "::" . __FUNCTION__ . " Exception Occured " . $e->getMessage());

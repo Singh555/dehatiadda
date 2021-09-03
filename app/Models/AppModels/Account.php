@@ -758,16 +758,16 @@ class Account extends Model
                 return returnResponse("User data fetching failed !");
             }
             
-            if($user->is_active == 'Y'){
+            if($user->is_active == 'YES'){
                 Log::error(__CLASS__." :: ".__FUNCTION__." user already is a prime member !!");
                 return returnResponse("You Are Already upgraded !");
             }
             
             
-            $activationHistoryData = CumtomerActHistory::where('customer_id', '=', $user->id)->orderBY('id','desc')->first();
-            if(isset($activationHistoryData->status) && $activationHistoryData->status =='PENDING' || $activationHistoryData->status =='SUCCESS'){
+            $activationHistoryData = CumtomerActHistory::where('customer_id', '=', $user->id)->whereIn('status',['PENDING','SUCCESS','PROCESSING'])->orderBY('id','desc')->count();
+            if($activationHistoryData>0 ){
                 Log::error(__CLASS__." :: ".__FUNCTION__." user already paid to become prime member !!");
-                return returnResponse("You have already paid !");
+                return returnResponse("You have already attempted for payment !");
             }                      
             
             Log::debug(__CLASS__." :: ".__FUNCTION__." starting try catch");
