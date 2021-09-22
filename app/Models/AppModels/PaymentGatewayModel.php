@@ -903,7 +903,7 @@ class PaymentGatewayModel {
                 'orderId'         => $txn_id,
                 'orderAmount'          => $amount,
                 'orderCurrency'        => 'INR',
-                
+                'environment' => 'PROD',
             ];
 
             $headers = array("Content-Type: application/json","x-client-id: $apiKey","x-client-secret: $apiSecret");

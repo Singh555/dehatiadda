@@ -806,9 +806,10 @@ class Account extends Model
                                 $data = array(
                                     'cf_token' => $payment_data["cftoken"],
                                     'txn_id' => $txn_id,
-                                  	'order_id' => $txn_id,
+                                    'order_id' => $txn_id,
                                     'currency' => 'INR',
                                     'amount' => $pgateway_amount,
+                                    'environment' => 'PROD',
                                 );
                                 DB::commit();
                                 Log::info(__CLASS__ . " :: " . __FUNCTION__ . " token creation success with cash Free token " . $payment_data["cftoken"]);
